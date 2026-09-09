@@ -23,7 +23,8 @@ import { UsersModule } from './users/users.module.js';
           emailAndPassword: {
             enabled: true,
           },
-          trustedOrigins: [configService.getOrThrow('FRONTEND_URL')],
+          // trustedOrigins: [configService.getOrThrow('FRONTEND_URL')],
+          trustedOrigins: ['*'],
         }),
       }),
       inject: [DATABASE_CONNECTION, ConfigService],
