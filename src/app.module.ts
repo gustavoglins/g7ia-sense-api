@@ -8,6 +8,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from './database/database-connection.js';
 import { DatabaseModule } from './database/database.module.js';
 import { UsersModule } from './users/users.module.js';
+import { CompaniesModule } from './companies/companies.module.js';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module.js';
       }),
       inject: [DATABASE_CONNECTION, ConfigService],
     }),
+    CompaniesModule,
   ],
   controllers: [],
   providers: [
