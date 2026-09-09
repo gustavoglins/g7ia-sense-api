@@ -46,7 +46,6 @@ export const devices = pgTable(
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
-    deletedAt: timestamp('deleted_at'),
   },
   (table) => [index('devices_sector_id_idx').on(table.sectorId)],
 );

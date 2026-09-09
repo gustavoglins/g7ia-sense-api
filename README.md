@@ -407,7 +407,7 @@ O sucesso retorna `201` com o registro criado, incluindo `id`, `deviceId`,
 repetir o horário de uma medição anterior.
 
 - `401`: chave ausente, inválida ou do tipo READ.
-- `403`: device inativo ou marcado como excluído.
+- `403`: device inativo.
 - `400`: payload inválido ou device do tipo act/adv, ainda sem telemetria.
 
 A migração `0012_device_telemetry` cria as três tabelas com chaves estrangeiras
@@ -416,6 +416,11 @@ telemetrias em cascata. A escolha da tabela pelo tipo é validada pela API.
 Este módulo disponibiliza apenas o POST; consultas com chave READ não estão implementadas.
 Como os GETs de devices retornam ambas as chaves, usuários com acesso a esses GETs
 também podem obter a chave WRITE e enviar medições.
+
+A migração `0013_remove_soft_delete_fields` remove definitivamente a coluna
+`deleted_at` de empresas, instalações, setores e devices. Os endpoints `DELETE`
+apagam os registros do banco; as chaves estrangeiras removem em cascata os dados
+dependentes, incluindo chaves de API e telemetrias.
 
 ## Migrações
 

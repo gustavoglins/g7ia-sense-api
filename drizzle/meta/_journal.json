@@ -92,6 +92,13 @@
       "when": 1788984404324,
       "tag": "0012_device_telemetry",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788985623507,
+      "tag": "0013_remove_soft_delete_fields",
+      "breakpoints": true
     }
   ]
 }

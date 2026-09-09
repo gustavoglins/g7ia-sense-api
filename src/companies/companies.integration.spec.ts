@@ -1109,9 +1109,8 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
           await send(payload).expect(403);
           await db
             .update(devicesSchema.devices)
-            .set({ status: 'active', deletedAt: new Date() })
+            .set({ status: 'active' })
             .where(eq(devicesSchema.devices.id, device.id));
-          await send(payload).expect(403);
           await deviceService.remove(parent.admin.id, device.id);
           await send(payload).expect(401);
           expect(

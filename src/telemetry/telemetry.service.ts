@@ -36,7 +36,7 @@ export class TelemetryService {
         and(eq(deviceApiKeys.apiKey, key), eq(deviceApiKeys.type, 'write')),
       );
     if (!record) throw new UnauthorizedException('Chave WRITE inválida.');
-    if (record.device.status !== 'active' || record.device.deletedAt)
+    if (record.device.status !== 'active')
       throw new ForbiddenException('Device indisponível.');
     return record.device;
   }

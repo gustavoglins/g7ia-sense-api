@@ -27,7 +27,6 @@ export const sectors = pgTable(
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
-    deletedAt: timestamp('deleted_at'),
   },
   (table) => [index('sectors_installation_id_idx').on(table.installationId)],
 );
