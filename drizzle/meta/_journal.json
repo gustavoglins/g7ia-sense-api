@@ -8,6 +8,76 @@
       "when": 1788922489634,
       "tag": "0000_spotty_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788932202128,
+      "tag": "0001_company_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788932473680,
+      "tag": "0002_require_user_company",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788932809847,
+      "tag": "0003_username_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788932865380,
+      "tag": "0004_require_company_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788934312055,
+      "tag": "0005_user_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788934398842,
+      "tag": "0006_system_admin_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788936030946,
+      "tag": "0007_company_installations",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788965569564,
+      "tag": "0008_installation_sectors",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788981555588,
+      "tag": "0009_sector_devices",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788981984596,
+      "tag": "0010_required_device_type",
+      "breakpoints": true
     }
   ]
 }

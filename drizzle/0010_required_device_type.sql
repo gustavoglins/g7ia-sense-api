@@ -1,0 +1,1 @@
+ALTER TABLE "devices" ADD COLUMN "devices_type" "devices_types" NOT NULL;

@@ -1,34 +1,57 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { CompaniesService } from './companies.service.js';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
-import { UpdateCompanyDto } from './dto/update-company.dto.js';
+import { Session } from '@thallesp/nestjs-better-auth';
+import type { UserSession } from '@thallesp/nestjs-better-auth';
 
 @Controller('companies')
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
   @Post()
-  create(@Body() createCompanyDto: CreateCompanyDto) {
-    return this.companiesService.create(createCompanyDto);
+  create(
+    @Session() session: UserSession,
+    @Body() createCompanyDto: CreateCompanyDto,
+  ) {
+    return this.companiesService.create(session.user.id, createCompanyDto);
   }
 
   @Get()
-  findAll() {
-    return this.companiesService.findAll();
+  findAll(@Session() session: UserSession) {
+    return this.companiesService.findAll(session.user.id);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.companiesService.findOne(+id);
+  findOne(
+    @Session() session: UserSession,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.companiesService.findOne(session.user.id, id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCompanyDto: UpdateCompanyDto) {
-    return this.companiesService.update(+id, updateCompanyDto);
+  update(
+    @Session() session: UserSession,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    return this.companiesService.update(session.user.id, id, body);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.companiesService.remove(+id);
+  remove(
+    @Session() session: UserSession,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.companiesService.remove(session.user.id, id);
   }
 }

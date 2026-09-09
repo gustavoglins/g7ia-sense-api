@@ -7,6 +7,10 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate",
+    "predb:seed": "npm run build",
+    "db:seed": "node --env-file-if-exists=.env dist/database/seed-cli.js",
+    "roles:promote": "node --env-file-if-exists=.env scripts/promote-super-admin.mjs",
     "build": "nest build",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

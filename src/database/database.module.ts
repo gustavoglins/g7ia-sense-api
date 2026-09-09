@@ -4,6 +4,10 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_CONNECTION } from './database-connection.js';
 import * as authSchema from '../auth/schema.js';
+import * as companiesSchema from '../companies/companies.schema.js';
+import * as installationsSchema from '../installations/installations.schema.js';
+import * as sectorsSchema from '../sectors/sectors.schema.js';
+import * as devicesSchema from '../devices/devices.schema.js';
 
 @Module({
   imports: [ConfigModule],
@@ -17,6 +21,10 @@ import * as authSchema from '../auth/schema.js';
         return drizzle(pool, {
           schema: {
             ...authSchema,
+            ...companiesSchema,
+            ...installationsSchema,
+            ...sectorsSchema,
+            ...devicesSchema,
           },
         });
       },

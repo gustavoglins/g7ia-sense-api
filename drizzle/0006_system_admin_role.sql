@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD CONSTRAINT "system_admin_role" CHECK ("user"."username" NOT LIKE 'admin@%' OR "user"."role" IN ('admin', 'super_admin'));

@@ -1,0 +1,39 @@
+{
+  "name": "G7I Energy",
+  "legalName": "G7I Energy Ltda",
+  "taxId": "00000000000100",
+  "email": "contato@g7ienergy.com",
+  "phone": "+551100000000",
+  "website": "http://g7ienergy.com/",
+  "zipcode": "01001000",
+  "country": "Brasil",
+  "state": "SP",
+  "city": "São Paulo",
+  "district": "Centro",
+  "street": "Rua de Exemplo",
+  "number": "100",
+  "complement": "Sala 1",
+  "status": "active",
+  "notes": "1",
+  "installation": {
+    "name": "Matriz - G7I Energy",
+    "description": "Instalação inicial da empresa",
+    "status": "active",
+    "sectors": [
+      {
+        "name": "Geral - G7I Energy",
+        "description": "Setor inicial da instalação matriz",
+        "status": "active",
+        "devices": [
+          {
+            "name": "Medidor inicial",
+            "devicesType": "ac",
+            "serialNumber": "DEMO-G7I-001",
+            "version": "1.0",
+            "status": "active"
+          }
+        ]
+      }
+    ]
+  }
+}

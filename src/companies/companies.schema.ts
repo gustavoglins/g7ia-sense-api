@@ -1,6 +1,5 @@
 import {
   pgTable,
-  serial,
   varchar,
   text,
   timestamp,
@@ -8,13 +7,17 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-const companyStatus = pgEnum('company_status', ['active', 'inactive']);
+export const companyStatus = pgEnum('company_status', ['active', 'inactive']);
 
 export const companies = pgTable('companies', {
   id: uuid('id').defaultRandom().primaryKey(),
 
   name: varchar('name', { length: 255 }).notNull(),
   legalName: varchar('legal_name', { length: 255 }).notNull().unique(),
+  // Immutable login suffix, generated from legalName at creation.
+  usernameSuffix: varchar('username_suffix', { length: 100 })
+    .notNull()
+    .unique(),
 
   taxId: varchar('taxId', { length: 255 }).notNull().unique(),
 
@@ -34,8 +37,6 @@ export const companies = pgTable('companies', {
   status: companyStatus('status').notNull(),
 
   notes: text('notes'),
-
-  // users
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

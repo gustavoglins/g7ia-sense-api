@@ -1,0 +1,1 @@
+ALTER TABLE "user" ALTER COLUMN "company_id" SET NOT NULL;
