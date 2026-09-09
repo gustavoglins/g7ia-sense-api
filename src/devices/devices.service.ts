@@ -4,15 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { eq, getTableColumns } from 'drizzle-orm';
+import { eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection.js';
 import { assertManage, assertRead, loadActor } from '../auth/roles.js';
 import { inputObject, requiredText } from '../common/input.js';
 import { installations } from '../installations/installations.schema.js';
 import { sectors } from '../sectors/sectors.schema.js';
-import { devices } from './devices.schema.js';
+import { deviceApiKeys, devices } from './devices.schema.js';
 import { CreateDeviceDto, deviceFields } from './dto/create-device.dto.js';
+import { generateDeviceApiKey } from './device-api-keys.js';
 
 @Injectable()
 export class DevicesService {
@@ -38,6 +39,8 @@ export class DevicesService {
     )
       throw new BadRequestException('Campos não permitidos.');
     const data = CreateDeviceDto.parse(input);
+    const readKey = generateDeviceApiKey('read');
+    const writeKey = generateDeviceApiKey('write');
     return this.db.transaction(async (tx) => {
       const [parent] = await tx
         .select({ companyId: installations.companyId })
@@ -51,13 +54,20 @@ export class DevicesService {
         .insert(devices)
         .values({ ...data, sectorId })
         .returning();
-      return created;
+      await tx.insert(deviceApiKeys).values([
+        { deviceId: created.id, type: 'read', apiKey: readKey },
+        { deviceId: created.id, type: 'write', apiKey: writeKey },
+      ]);
+      return {
+        ...created,
+        apiKeys: { read: readKey, write: writeKey },
+      };
     });
   }
 
   async findAll(actorId: string) {
     const actor = await loadActor(this.db, actorId);
-    return this.db
+    const result = await this.db
       .select(getTableColumns(devices))
       .from(devices)
       .innerJoin(sectors, eq(devices.sectorId, sectors.id))
@@ -67,6 +77,7 @@ export class DevicesService {
           ? undefined
           : eq(installations.companyId, actor.companyId),
       );
+    return this.withApiKeys(result);
   }
 
   private async findWithCompany(id: string) {
@@ -84,7 +95,7 @@ export class DevicesService {
     const actor = await loadActor(this.db, actorId);
     const record = await this.findWithCompany(id);
     assertRead(actor, record.companyId);
-    return record.device;
+    return (await this.withApiKeys([record.device]))[0];
   }
 
   async update(actorId: string, id: string, body: unknown) {
@@ -106,7 +117,7 @@ export class DevicesService {
       .where(eq(devices.id, id))
       .returning();
     if (!updated) throw new NotFoundException('Device não encontrado.');
-    return updated;
+    return (await this.withApiKeys([updated]))[0];
   }
 
   async remove(actorId: string, id: string) {
@@ -119,5 +130,42 @@ export class DevicesService {
       .returning({ id: devices.id });
     if (!removed) throw new NotFoundException('Device não encontrado.');
     return removed;
+  }
+
+  private async withApiKeys<T extends { id: string }>(devicesToAttach: T[]) {
+    if (!devicesToAttach.length)
+      return [] as (T & { apiKeys: { read: string; write: string } })[];
+    const keys = await this.db
+      .select({
+        deviceId: deviceApiKeys.deviceId,
+        type: deviceApiKeys.type,
+        apiKey: deviceApiKeys.apiKey,
+      })
+      .from(deviceApiKeys)
+      .where(
+        inArray(
+          deviceApiKeys.deviceId,
+          devicesToAttach.map((device) => device.id),
+        ),
+      );
+    const byDevice = new Map<
+      string,
+      Partial<Record<'read' | 'write', string>>
+    >();
+    for (const key of keys) {
+      const values = byDevice.get(key.deviceId) ?? {};
+      values[key.type] = key.apiKey;
+      byDevice.set(key.deviceId, values);
+    }
+    return devicesToAttach.map((device) => {
+      const apiKeys = byDevice.get(device.id);
+      if (!apiKeys?.read || !apiKeys.write) {
+        throw new Error(`Device ${device.id} is missing an API key pair.`);
+      }
+      return {
+        ...device,
+        apiKeys: { read: apiKeys.read, write: apiKeys.write },
+      };
+    });
   }
 }

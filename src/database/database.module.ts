@@ -8,6 +8,7 @@ import * as companiesSchema from '../companies/companies.schema.js';
 import * as installationsSchema from '../installations/installations.schema.js';
 import * as sectorsSchema from '../sectors/sectors.schema.js';
 import * as devicesSchema from '../devices/devices.schema.js';
+import * as telemetrySchema from '../telemetry/telemetry.schema.js';
 
 @Module({
   imports: [ConfigModule],
@@ -25,6 +26,7 @@ import * as devicesSchema from '../devices/devices.schema.js';
             ...installationsSchema,
             ...sectorsSchema,
             ...devicesSchema,
+            ...telemetrySchema,
           },
         });
       },

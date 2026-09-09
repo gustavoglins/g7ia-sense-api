@@ -13,6 +13,7 @@ import { authOptions } from './auth/auth-options.js';
 import { InstallationsModule } from './installations/installations.module.js';
 import { SectorsModule } from './sectors/sectors.module.js';
 import { DevicesModule } from './devices/devices.module.js';
+import { TelemetryModule } from './telemetry/telemetry.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { DevicesModule } from './devices/devices.module.js';
     InstallationsModule,
     SectorsModule,
     DevicesModule,
+    TelemetryModule,
   ],
   controllers: [],
   providers: [

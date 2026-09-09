@@ -12,10 +12,19 @@ import { installations } from '../installations/installations.schema.js';
 import { CreateInstallationDto } from '../installations/dto/create-installation.dto.js';
 import { sectors } from '../sectors/sectors.schema.js';
 import { CreateSectorDto } from '../sectors/dto/create-sector.dto.js';
-import { devices } from '../devices/devices.schema.js';
+import { deviceApiKeys, devices } from '../devices/devices.schema.js';
 import { CreateDeviceDto } from '../devices/dto/create-device.dto.js';
+import {
+  generateDeviceApiKey,
+  type DeviceApiKeyType,
+} from '../devices/device-api-keys.js';
 
 type SeedRecord = { id: string; name: string; created: boolean };
+type DeviceApiKeyPair = Record<DeviceApiKeyType, string>;
+type SeedDevice = SeedRecord & {
+  apiKeys: DeviceApiKeyPair;
+  generatedApiKeys?: Partial<DeviceApiKeyPair>;
+};
 
 // Local provisioning only: never expose this function through a public route.
 export async function seedInitialCompany(db: NodePgDatabase, input: unknown) {
@@ -90,11 +99,39 @@ export async function seedInitialCompany(db: NodePgDatabase, input: unknown) {
     return await db.transaction(async (tx) => {
       // Serializes simultaneous executions of the seed, including an empty database.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(7142026)`);
+      async function ensureDeviceApiKeys(deviceId: string) {
+        const existing = await tx
+          .select({ type: deviceApiKeys.type, apiKey: deviceApiKeys.apiKey })
+          .from(deviceApiKeys)
+          .where(eq(deviceApiKeys.deviceId, deviceId));
+        const existingTypes = new Set(existing.map((key) => key.type));
+        const values: Partial<Record<DeviceApiKeyType, string>> =
+          Object.fromEntries(existing.map((key) => [key.type, key.apiKey]));
+        const generated: Partial<Record<DeviceApiKeyType, string>> = {};
+        for (const type of ['read', 'write'] as const) {
+          if (existingTypes.has(type)) continue;
+          const apiKey = generateDeviceApiKey(type);
+          await tx.insert(deviceApiKeys).values({
+            deviceId,
+            type,
+            apiKey,
+          });
+          values[type] = apiKey;
+          generated[type] = apiKey;
+        }
+        if (!values.read || !values.write) {
+          throw new Error(`Device ${deviceId} is missing an API key pair.`);
+        }
+        return {
+          values: { read: values.read, write: values.write },
+          generated: Object.keys(generated).length ? generated : undefined,
+        };
+      }
       async function ensureDevices(
         sectorId: string,
         data: (typeof sectorData)[number]['devices'],
       ) {
-        const result: SeedRecord[] = [];
+        const result: SeedDevice[] = [];
         for (const device of data) {
           const existing = await tx
             .select({ id: devices.id, name: devices.name })
@@ -110,19 +147,34 @@ export async function seedInitialCompany(db: NodePgDatabase, input: unknown) {
             throw new ConflictException(
               'Há mais de um device com o mesmo nome no setor. O seed não pode identificar o registro; nenhuma alteração foi salva.',
             );
-          if (existing.length) result.push({ ...existing[0], created: false });
-          else {
+          if (existing.length) {
+            const { values, generated } = await ensureDeviceApiKeys(
+              existing[0].id,
+            );
+            result.push({
+              ...existing[0],
+              created: false,
+              apiKeys: values,
+              generatedApiKeys: generated,
+            });
+          } else {
             const [created] = await tx
               .insert(devices)
               .values({ ...device, sectorId })
               .returning({ id: devices.id, name: devices.name });
-            result.push({ ...created, created: true });
+            const { values, generated } = await ensureDeviceApiKeys(created.id);
+            result.push({
+              ...created,
+              created: true,
+              apiKeys: values,
+              generatedApiKeys: generated,
+            });
           }
         }
         return result;
       }
       async function ensureSectors(installationId: string) {
-        const result: (SeedRecord & { devices: SeedRecord[] })[] = [];
+        const result: (SeedRecord & { devices: SeedDevice[] })[] = [];
         for (const { devices: deviceData, ...data } of sectorData) {
           const [existingSector] = await tx
             .select()

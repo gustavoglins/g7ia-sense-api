@@ -27,7 +27,9 @@ async function main() {
           : result.sectors.some((sector) => sector.created)
             ? 'Setores e devices faltantes criados; dados existentes e senha preservados.'
             : result.sectors.some((sector) =>
-                  sector.devices.some((device) => device.created),
+                  sector.devices.some(
+                    (device) => device.created || device.generatedApiKeys,
+                  ),
                 )
               ? 'Devices faltantes criados; dados existentes e senha preservados.'
               : 'Seed já aplicado; dados e senha preservados.',
@@ -39,10 +41,15 @@ async function main() {
       console.log(
         `Setor: ${sector.name} (${sector.id}) — ${sector.created ? 'criado' : 'existente'}`,
       );
-      for (const device of sector.devices)
+      for (const device of sector.devices) {
         console.log(
           `  Device: ${device.name} (${device.id}) — ${device.created ? 'criado' : 'existente'}`,
         );
+        if (device.generatedApiKeys?.read)
+          console.log(`    READ: ${device.generatedApiKeys.read}`);
+        if (device.generatedApiKeys?.write)
+          console.log(`    WRITE: ${device.generatedApiKeys.write}`);
+      }
     }
   } catch (error) {
     // Drizzle errors may contain query parameters. Do not print credentials or hashes.

@@ -5,9 +5,15 @@ import {
   timestamp,
   pgEnum,
   uuid,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { sectors } from '../sectors/sectors.schema.js';
+import {
+  telemetryAc,
+  telemetryDc,
+  telemetryEnv,
+} from '../telemetry/telemetry.schema.js';
 
 export const devicesTypes = pgEnum('devices_types', [
   'ac',
@@ -17,6 +23,10 @@ export const devicesTypes = pgEnum('devices_types', [
   'adv',
 ]);
 export const devicesStatus = pgEnum('devices_status', ['active', 'inactive']);
+export const deviceApiKeyType = pgEnum('device_api_key_type', [
+  'read',
+  'write',
+]);
 
 export const devices = pgTable(
   'devices',
@@ -41,9 +51,40 @@ export const devices = pgTable(
   (table) => [index('devices_sector_id_idx').on(table.sectorId)],
 );
 
-export const devicesRelations = relations(devices, ({ one }) => ({
+export const deviceApiKeys = pgTable(
+  'device_api_keys',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    deviceId: uuid('device_id')
+      .notNull()
+      .references(() => devices.id, { onDelete: 'cascade' }),
+    type: deviceApiKeyType('type').notNull(),
+    apiKey: varchar('api_key', { length: 128 }).notNull().unique(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('device_api_keys_device_type_unique').on(
+      table.deviceId,
+      table.type,
+    ),
+  ],
+);
+
+export const devicesRelations = relations(devices, ({ one, many }) => ({
+  apiKeys: many(deviceApiKeys),
+  telemetryAc: many(telemetryAc),
+  telemetryDc: many(telemetryDc),
+  telemetryEnv: many(telemetryEnv),
   sector: one(sectors, {
     fields: [devices.sectorId],
     references: [sectors.id],
+  }),
+}));
+
+export const deviceApiKeysRelations = relations(deviceApiKeys, ({ one }) => ({
+  device: one(devices, {
+    fields: [deviceApiKeys.deviceId],
+    references: [devices.id],
   }),
 }));

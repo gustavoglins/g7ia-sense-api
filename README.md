@@ -13,14 +13,14 @@ O login usa username e senha, com o plugin `username` do Better Auth.
 
 ## Roles e permissões
 
-| Operação | `super_admin` | `admin` | `user` |
-| --- | --- | --- | --- |
-| Consultar empresas e usuários | Todas as empresas | Própria empresa | Própria empresa |
-| Criar empresa | Sim | Não | Não |
-| Editar ou excluir empresa | Todas | Própria empresa | Não |
-| Criar, editar ou excluir usuários | Todas as empresas | Própria empresa | Não |
-| Atribuir `user` ou `admin` | Sim | Própria empresa | Não |
-| Atribuir ou alterar uma conta `super_admin` | Sim | Não | Não |
+| Operação                                    | `super_admin`     | `admin`         | `user`          |
+| ------------------------------------------- | ----------------- | --------------- | --------------- |
+| Consultar empresas e usuários               | Todas as empresas | Própria empresa | Própria empresa |
+| Criar empresa                               | Sim               | Não             | Não             |
+| Editar ou excluir empresa                   | Todas             | Própria empresa | Não             |
+| Criar, editar ou excluir usuários           | Todas as empresas | Própria empresa | Não             |
+| Atribuir `user` ou `admin`                  | Sim               | Própria empresa | Não             |
+| Atribuir ou alterar uma conta `super_admin` | Sim               | Não             | Não             |
 
 O `super_admin` continua vinculado a uma empresa, mas tem alcance global. Um `admin` não pode editar, redefinir a senha ou excluir um `super_admin`, mesmo na própria empresa, nem excluir uma empresa que contenha um `super_admin`.
 
@@ -117,6 +117,8 @@ Cada setor pode configurar uma lista não vazia de `devices`:
 Sem `devices`, o seed cria um `Device inicial` do tipo `ac` em cada setor, com o status do setor. Devices explicitamente configurados no JSON devem informar `devicesType`. Os dados do exemplo são demonstrativos; o seed apenas cadastra registros, sem conectar equipamentos físicos. `serialNumber`, `version` e `macAddress` são opcionais.
 
 Devices do seed são reconhecidos por **setor + nome**. Reexecutar cria apenas os faltantes e preserva os dados existentes. Nomes iguais em setores diferentes são permitidos; nomes repetidos na mesma lista são rejeitados. Se já houver vários devices com o mesmo nome no mesmo setor, o seed falha por ambiguidade sem salvar alterações. Alterar o nome no JSON representa outro device. O `sectorId` é sempre atribuído pelo seed, e a saída informa IDs e quais devices foram criados.
+
+Cada device criado pelo seed recebe uma chave `READ` e uma `WRITE`. O comando imprime os dois segredos somente quando eles são gerados. Guarde-os em um gerenciador de segredos: em execuções posteriores, devices já completos aparecem como existentes e suas chaves não são exibidas novamente.
 
 ### Promover uma conta existente a super_admin
 
@@ -334,6 +336,86 @@ await db.query.devices.findFirst({
 ```
 
 A migração `0009_sector_devices` cria a tabela, os enums declarados no schema, a chave estrangeira e o índice. Aplique com `npm run db:migrate`.
+
+### Chaves de API do device
+
+Ao criar um device, a API gera duas chaves criptograficamente aleatórias:
+
+- `READ`, retornada em `apiKeys.read` com prefixo `g7_read_`;
+- `WRITE`, retornada em `apiKeys.write` com prefixo `g7_write_`.
+
+Exemplo resumido da resposta de `POST /api/devices`:
+
+```json
+{
+  "id": "UUID-do-device",
+  "sectorId": "UUID-do-setor",
+  "name": "Medidor principal",
+  "devicesType": "ac",
+  "status": "active",
+  "apiKeys": {
+    "read": "g7_read_...",
+    "write": "g7_write_..."
+  }
+}
+```
+
+As chaves também são retornadas por `GET /api/devices` e `GET /api/devices/:id`. A aplicação guarda os valores gerados na tabela `device_api_keys`, sem hash, para que possam acompanhar o device nas consultas. Trate o acesso ao banco e aos backups como acesso a segredos.
+
+O banco garante, ao final da transação, exatamente uma chave `read` e uma `write` para cada device. Não é possível confirmar um device sem o par, remover somente uma chave ou cadastrar duas chaves do mesmo tipo. A exclusão do device remove as chaves em cascata.
+
+A migração `0011_device_api_keys` cria a tabela, o enum, as constraints e os gatilhos diferidos. Devices que já existirem ao aplicá-la recebem um par de chaves gerado pela migração. Devices novos e os criados pelo seed também recebem o par normalmente.
+
+Conforme solicitado, esta etapa ainda não usa as chaves para autorizar operações `READ` ou `WRITE`; ela apenas gera, persiste e garante o par obrigatório.
+
+### Envio de telemetria por dispositivos IoT
+
+`POST /api/telemetry` recebe uma medição por requisição, sem sessão ou login.
+Envie a chave WRITE do device no header `X-API-Key`:
+
+```http
+POST /api/telemetry
+Content-Type: application/json
+X-API-Key: g7_write_...
+
+{
+  "time": "2026-09-09T18:30:00Z",
+  "v1": "220.5",
+  "a1": "10.2",
+  "fp1": "0.98",
+  "rssi": "-67"
+}
+```
+
+A chave identifica o device; seu tipo determina a tabela e os campos aceitos:
+
+| Tipo | Tabela | Medições opcionais (strings ou null) |
+| --- | --- | --- |
+| ac | telemetry_ac | v1, a1, fp1, rssi |
+| env | telemetry_env | temp, humidity, solar, light, wind, h2, rssi |
+| dc | telemetry_dc | vdc1, cc1, vdc2, cc2, vdc3, cc3, rssi |
+
+`time` é obrigatório e deve ser uma data válida em ISO 8601, com segundos e fuso
+horário (`Z` ou offset), podendo incluir até três casas de milissegundos.
+O banco armazena `time` e `created_at` como timestamps com fuso horário.
+`id` e `created_at` são gerados pelo banco, e `device_id` é determinado pela chave.
+Campos desconhecidos ou controlados pelo servidor são rejeitados.
+Medições ausentes são armazenadas como null; números devem ser enviados como strings.
+
+O sucesso retorna `201` com o registro criado, incluindo `id`, `deviceId`,
+`time`, `createdAt` e as medições. Cada envio cria um novo registro, mesmo se
+repetir o horário de uma medição anterior.
+
+- `401`: chave ausente, inválida ou do tipo READ.
+- `403`: device inativo ou marcado como excluído.
+- `400`: payload inválido ou device do tipo act/adv, ainda sem telemetria.
+
+A migração `0012_device_telemetry` cria as três tabelas com chaves estrangeiras
+e índices em `(device_id, time)`. A exclusão física de um device remove suas
+telemetrias em cascata. A escolha da tabela pelo tipo é validada pela API.
+Este módulo disponibiliza apenas o POST; consultas com chave READ não estão implementadas.
+Como os GETs de devices retornam ambas as chaves, usuários com acesso a esses GETs
+também podem obter a chave WRITE e enviar medições.
 
 ## Migrações
 

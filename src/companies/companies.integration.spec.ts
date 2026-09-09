@@ -18,6 +18,14 @@ import * as sectorsSchema from '../sectors/sectors.schema.js';
 import { SectorsService } from '../sectors/sectors.service.js';
 import * as devicesSchema from '../devices/devices.schema.js';
 import { DevicesService } from '../devices/devices.service.js';
+import { Test } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
+import { AuthGuard } from '@thallesp/nestjs-better-auth';
+import request from 'supertest';
+import { TelemetryController } from '../telemetry/telemetry.controller.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { WriteApiKeyGuard } from '../telemetry/write-api-key.guard.js';
+import * as telemetrySchema from '../telemetry/telemetry.schema.js';
 
 // Explicitly opt in with an EMPTY disposable database; never reads DATABASE_URL.
 describe.skipIf(!process.env.DATABASE_TEST_URL)(
@@ -31,6 +39,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         ...installationsSchema,
         ...sectorsSchema,
         ...devicesSchema,
+        ...telemetrySchema,
       },
     });
     const installationService = new InstallationsService(db);
@@ -228,6 +237,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
           devices: sector.devices.map((device) => ({
             ...device,
             created: false,
+            generatedApiKeys: undefined,
           })),
         })),
       });
@@ -432,6 +442,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         devices: first.sectors[0].devices.map((device) => ({
           ...device,
           created: false,
+          generatedApiKeys: undefined,
         })),
       });
       expect(repeated.sectors[1].created).toBe(true);
@@ -527,6 +538,20 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       expect(first.sectors[0].devices[0].id).not.toBe(
         first.sectors[1].devices[0].id,
       );
+      for (const sector of first.sectors) {
+        for (const device of sector.devices) {
+          expect(device.apiKeys?.read).toMatch(/^g7_read_/);
+          expect(device.apiKeys?.write).toMatch(/^g7_write_/);
+          const storedKeys = await db
+            .select()
+            .from(devicesSchema.deviceApiKeys)
+            .where(eq(devicesSchema.deviceApiKeys.deviceId, device.id));
+          expect(storedKeys).toHaveLength(2);
+          for (const key of storedKeys) {
+            expect(key.apiKey).toBe(device.apiKeys[key.type]);
+          }
+        }
+      }
       const [meter] = await db
         .select()
         .from(devicesSchema.devices)
@@ -550,7 +575,23 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       expect(
         repeated.sectors[0].devices.map((device) => device.created),
       ).toEqual([false, true]);
+      expect(repeated.sectors[0].devices[0].apiKeys).toEqual(
+        first.sectors[0].devices[0].apiKeys,
+      );
+      expect(repeated.sectors[0].devices[0].generatedApiKeys).toBeUndefined();
+      expect(repeated.sectors[0].devices[1].apiKeys).toEqual({
+        read: expect.stringMatching(/^g7_read_/),
+        write: expect.stringMatching(/^g7_write_/),
+      });
+      expect(repeated.sectors[0].devices[1].generatedApiKeys).toEqual({
+        read: expect.stringMatching(/^g7_read_/),
+        write: expect.stringMatching(/^g7_write_/),
+      });
       expect(repeated.sectors[1].devices[0].created).toBe(false);
+      expect(repeated.sectors[1].devices[0].apiKeys).toEqual(
+        first.sectors[1].devices[0].apiKeys,
+      );
+      expect(repeated.sectors[1].devices[0].generatedApiKeys).toBeUndefined();
       const [preserved] = await db
         .select()
         .from(devicesSchema.devices)
@@ -559,7 +600,9 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       const again = await seedInitialCompany(db, data);
       expect(
         again.sectors.every((sector) =>
-          sector.devices.every((device) => !device.created),
+          sector.devices.every(
+            (device) => !device.created && !device.generatedApiKeys,
+          ),
         ),
       ).toBe(true);
     });
@@ -592,14 +635,11 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         },
       };
       const first = await seedInitialCompany(db, data);
-      await db
-        .insert(devicesSchema.devices)
-        .values({
-          devicesType: 'ac',
-          sectorId: first.sectors[0].id,
-          name: 'Meter',
-          status: 'active',
-        });
+      await deviceService.create(rootId, {
+        sectorId: first.sectors[0].id,
+        name: 'Meter',
+        devicesType: 'ac',
+      });
       await expect(
         seedInitialCompany(db, {
           ...data,
@@ -958,6 +998,146 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       return { company, admin, installation, sector };
     }
 
+    it('accepts IoT telemetry without a session and enforces WRITE keys and typed payloads over HTTP', async () => {
+      const module = await Test.createTestingModule({
+        controllers: [TelemetryController],
+        providers: [
+          { provide: TelemetryService, useValue: new TelemetryService(db) },
+          WriteApiKeyGuard,
+        ],
+      }).compile();
+      const app = module.createNestApplication();
+      app.setGlobalPrefix('api');
+      const auth = betterAuth({
+        ...authOptions,
+        secret: 'integration-test-secret-0123456789-abcdefghijklmnopqrstuvwxyz',
+        baseURL: 'http://localhost:3000',
+        database: drizzleAdapter(db, { provider: 'pg' }),
+      });
+      app.useGlobalGuards(new AuthGuard(new Reflector(), { auth }));
+      await app.init();
+      try {
+        const parent = await deviceParent();
+        const samples = [
+          {
+            type: 'ac',
+            data: { v1: '220.5', a1: '10', fp1: '0.98', rssi: '-67' },
+            table: telemetrySchema.telemetryAc,
+          },
+          {
+            type: 'env',
+            data: {
+              temp: '25',
+              humidity: '60',
+              solar: '1',
+              light: '2',
+              wind: '3',
+              h2: '4',
+              rssi: '-60',
+            },
+            table: telemetrySchema.telemetryEnv,
+          },
+          {
+            type: 'dc',
+            data: {
+              vdc1: '1',
+              cc1: '2',
+              vdc2: '3',
+              cc2: '4',
+              vdc3: '5',
+              cc3: '6',
+              rssi: '-50',
+            },
+            table: telemetrySchema.telemetryDc,
+          },
+        ] as const;
+        for (const sample of samples) {
+          const device = await deviceService.create(parent.admin.id, {
+            sectorId: parent.sector.id,
+            name: sample.type,
+            devicesType: sample.type,
+          });
+          const send = (body: unknown, key = device.apiKeys.write) =>
+            request(app.getHttpServer())
+              .post('/api/telemetry')
+              .set('X-API-Key', key)
+              .send(body as object);
+          const payload = { time: '2026-09-09T15:00:00-03:00', ...sample.data };
+          const response = await send(payload).expect(201);
+          expect(response.body).toMatchObject({
+            deviceId: device.id,
+            time: '2026-09-09T18:00:00.000Z',
+            ...sample.data,
+          });
+          expect(response.body.id).toEqual(expect.any(String));
+          expect(response.body.createdAt).toEqual(expect.any(String));
+          const stored = await db
+            .select()
+            .from(sample.table)
+            .where(eq(sample.table.deviceId, device.id));
+          expect(stored).toHaveLength(1);
+          expect(stored[0]).toMatchObject({
+            deviceId: device.id,
+            ...sample.data,
+          });
+          await send({ time: payload.time }).expect(201);
+          await send(payload, device.apiKeys.read).expect(401);
+          await send(payload, 'g7_write_invalid').expect(401);
+          await request(app.getHttpServer())
+            .post('/api/telemetry')
+            .send(payload)
+            .expect(401);
+          for (const invalid of [
+            { ...payload, device_id: randomUUID() },
+            { ...payload, deviceId: randomUUID() },
+            { ...payload, id: randomUUID() },
+            { ...payload, created_at: payload.time },
+            { ...payload, unexpected: '1' },
+            { ...payload, rssi: -60 },
+            { ...payload, time: '2026-02-30T12:00:00Z' },
+            { ...payload, time: '2026-09-09T12:00:00' },
+            { ...payload, time: undefined },
+            sample.type === 'ac'
+              ? { ...payload, temp: '1' }
+              : { ...payload, v1: '1' },
+          ])
+            await send(invalid).expect(400);
+          await db
+            .update(devicesSchema.devices)
+            .set({ status: 'inactive' })
+            .where(eq(devicesSchema.devices.id, device.id));
+          await send(payload).expect(403);
+          await db
+            .update(devicesSchema.devices)
+            .set({ status: 'active', deletedAt: new Date() })
+            .where(eq(devicesSchema.devices.id, device.id));
+          await send(payload).expect(403);
+          await deviceService.remove(parent.admin.id, device.id);
+          await send(payload).expect(401);
+          expect(
+            await db
+              .select()
+              .from(sample.table)
+              .where(eq(sample.table.deviceId, device.id)),
+          ).toHaveLength(0);
+        }
+        for (const type of ['act', 'adv']) {
+          const device = await deviceService.create(parent.admin.id, {
+            sectorId: parent.sector.id,
+            name: type,
+            devicesType: type,
+          });
+          await request(app.getHttpServer())
+            .post('/api/telemetry')
+            .set('X-API-Key', device.apiKeys.write)
+            .send({ time: '2026-09-09T18:00:00Z' })
+            .expect(400);
+        }
+      } finally {
+        await app.close();
+      }
+    });
+
     it('supports multiple devices per sector and queries both relation directions', async () => {
       const parent = await deviceParent();
       const first = await deviceService.create(parent.admin.id, {
@@ -1085,14 +1265,12 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         ]),
       ).rejects.toMatchObject({ code: '23502' });
       await expect(
-        db
-          .insert(devicesSchema.devices)
-          .values({
-            devicesType: 'ac',
-            sectorId: randomUUID(),
-            name: 'Invalid FK',
-            status: 'active',
-          }),
+        db.insert(devicesSchema.devices).values({
+          devicesType: 'ac',
+          sectorId: randomUUID(),
+          name: 'Invalid FK',
+          status: 'active',
+        }),
       ).rejects.toThrow();
       for (const level of ['sector', 'installation', 'company']) {
         const parent = await deviceParent();
@@ -1171,6 +1349,69 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
           [parent.sector.id, 'Wrong Type', 'active', 'unknown'],
         ),
       ).rejects.toMatchObject({ code: '22P02' });
+    });
+
+    it('generates mandatory READ and WRITE API keys and returns them in GET responses', async () => {
+      const parent = await deviceParent();
+      const created = await deviceService.create(parent.admin.id, {
+        sectorId: parent.sector.id,
+        name: 'API Key Device',
+        devicesType: 'ac',
+      });
+      expect(created.apiKeys.read).toMatch(/^g7_read_[A-Za-z0-9_-]{43}$/);
+      expect(created.apiKeys.write).toMatch(/^g7_write_[A-Za-z0-9_-]{43}$/);
+      expect(created.apiKeys.read).not.toBe(created.apiKeys.write);
+      const stored = await db
+        .select()
+        .from(devicesSchema.deviceApiKeys)
+        .where(eq(devicesSchema.deviceApiKeys.deviceId, created.id));
+      expect(stored).toHaveLength(2);
+      expect(stored.map((key) => key.type).sort()).toEqual(['read', 'write']);
+      for (const key of stored) {
+        expect(key.apiKey).toBe(created.apiKeys[key.type]);
+      }
+      await expect(
+        deviceService.findOne(parent.admin.id, created.id),
+      ).resolves.toMatchObject({
+        apiKeys: created.apiKeys,
+      });
+      await expect(deviceService.findAll(parent.admin.id)).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: created.id, apiKeys: created.apiKeys }),
+        ]),
+      );
+    });
+
+    it('enforces exactly one READ and one WRITE key per device at commit', async () => {
+      const parent = await deviceParent();
+      await expect(
+        db.insert(devicesSchema.devices).values({
+          sectorId: parent.sector.id,
+          name: 'Missing API Keys',
+          devicesType: 'ac',
+          status: 'active',
+        }),
+      ).rejects.toMatchObject({ cause: { code: '23514' } });
+      const created = await deviceService.create(parent.admin.id, {
+        sectorId: parent.sector.id,
+        name: 'Protected API Keys',
+        devicesType: 'dc',
+      });
+      const [readKey] = await db
+        .select()
+        .from(devicesSchema.deviceApiKeys)
+        .where(eq(devicesSchema.deviceApiKeys.deviceId, created.id));
+      await expect(
+        db
+          .delete(devicesSchema.deviceApiKeys)
+          .where(eq(devicesSchema.deviceApiKeys.id, readKey.id)),
+      ).rejects.toMatchObject({ cause: { code: '23514' } });
+      expect(
+        await db
+          .select()
+          .from(devicesSchema.deviceApiKeys)
+          .where(eq(devicesSchema.deviceApiKeys.deviceId, created.id)),
+      ).toHaveLength(2);
     });
 
     it('rejects a user without a company', async () => {
