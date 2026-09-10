@@ -361,7 +361,17 @@ O retorno agora é um objeto (antes era um array):
       "sectorId": "sector-uuid",
       "sector": { "id": "sector-uuid", "name": "Geral" },
       "installation": { "id": "installation-uuid", "name": "Matriz" },
-      "apiKeys": { "read": "g7_read_...", "write": "g7_write_..." }
+      "apiKeys": { "read": "g7_read_...", "write": "g7_write_..." },
+      "latestTelemetry": {
+        "id": "telemetry-uuid",
+        "deviceId": "device-uuid",
+        "time": "2026-09-10T18:30:00.000Z",
+        "createdAt": "2026-09-10T18:30:01.000Z",
+        "v1": "220.5",
+        "a1": "10.2",
+        "fp1": "0.98",
+        "rssi": "-67"
+      }
     }
   ],
   "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
@@ -369,7 +379,7 @@ O retorno agora é um objeto (antes era um array):
 ```
 
 Os demais campos cadastrais continuam no device. `GET /api/devices/:id`
-também inclui `sector` e `installation`, retornando um único objeto.
+também inclui `sector`, `installation` e `latestTelemetry`, retornando um único objeto.
 No frontend, use `response.data` para a lista e `response.pagination`
 para os controles de página.
 
@@ -384,6 +394,23 @@ Para os seletores, use `GET /api/installations` e
 `GET /api/sectors?installationId=UUID`. Setores continuam retornando um
 array, ordenado por nome e ID, com o mesmo isolamento por empresa.
 Ao trocar a instalação, limpe o setor selecionado e volte à primeira página.
+
+Cada card recebe a última leitura em `latestTelemetry`, de acordo com o
+`deviceType` atual: AC, DC e ENV retornam os campos da respectiva tabela.
+Sem leituras, ou para tipos ACT/ADV, o campo é explicitamente `null`.
+Devices inativos continuam mostrando a última leitura armazenada.
+
+A leitura mais recente é definida por `time DESC`, com desempate por
+`createdAt DESC` e `id DESC`. Uma medição antiga recebida com atraso não
+substitui a medição mais recente do card. Se o tipo do device for alterado,
+leituras da tabela do tipo anterior não aparecem no novo tipo.
+
+As consultas buscam somente uma leitura por device da página autorizada,
+em até uma consulta por tipo presente. Os índices existentes em
+`(device_id, time)` atendem às buscas; não há nova migração.
+A leitura pelos GETs de devices usa a sessão e as permissões da empresa.
+No frontend, exiba “Sem leituras” para `null` e refaça o GET a cada 15 segundos
+enquanto a página estiver visível se desejar atualizar os cards automaticamente.
 
 ### Chaves de API do device
 
@@ -414,7 +441,8 @@ O banco garante, ao final da transação, exatamente uma chave `read` e uma `wri
 
 A migração `0011_device_api_keys` cria a tabela, o enum, as constraints e os gatilhos diferidos. Devices que já existirem ao aplicá-la recebem um par de chaves gerado pela migração. Devices novos e os criados pelo seed também recebem o par normalmente.
 
-Conforme solicitado, esta etapa ainda não usa as chaves para autorizar operações `READ` ou `WRITE`; ela apenas gera, persiste e garante o par obrigatório.
+A chave WRITE autoriza o envio de telemetria descrito abaixo. A chave READ
+ainda não possui endpoint; a última leitura dos cards é consultada pela sessão.
 
 ### Envio de telemetria por dispositivos IoT
 

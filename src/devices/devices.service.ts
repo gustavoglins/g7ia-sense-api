@@ -14,6 +14,7 @@ import { sectors } from '../sectors/sectors.schema.js';
 import { deviceApiKeys, devices } from './devices.schema.js';
 import { CreateDeviceDto, deviceFields } from './dto/create-device.dto.js';
 import { generateDeviceApiKey } from './device-api-keys.js';
+import { withLatestTelemetry } from '../telemetry/latest-telemetry.js';
 import {
   listQuery,
   optionalUuid,
@@ -116,7 +117,7 @@ export class DevicesService {
       .innerJoin(installations, eq(sectors.installationId, installations.id))
       .where(where);
     return {
-      data: await this.withApiKeys(result),
+      data: await withLatestTelemetry(this.db, await this.withApiKeys(result)),
       pagination: {
         page,
         limit,
@@ -147,13 +148,16 @@ export class DevicesService {
     const record = await this.findWithCompany(id);
     assertRead(actor, record.companyId);
     return (
-      await this.withApiKeys([
-        {
-          ...record.device,
-          sector: record.sector,
-          installation: record.installation,
-        },
-      ])
+      await withLatestTelemetry(
+        this.db,
+        await this.withApiKeys([
+          {
+            ...record.device,
+            sector: record.sector,
+            installation: record.installation,
+          },
+        ]),
+      )
     )[0];
   }
 

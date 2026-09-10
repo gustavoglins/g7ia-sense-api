@@ -1262,6 +1262,214 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       ).rejects.toMatchObject({ status: 400 });
     });
 
+    it('returns the latest measurement of each paginated device, with deterministic ties and company isolation', async () => {
+      const parent = await deviceParent();
+      const foreign = await deviceParent();
+      const reader = await users.create(parent.admin.id, {
+        name: 'Telemetry reader',
+        username: 'telemetry+reader@' + parent.company.usernameSuffix,
+        password,
+      });
+      const expected = new Map<string, unknown>();
+      const measuredAt = new Date('2026-09-10T12:00:00Z');
+      const receivedAt = new Date('2026-09-10T12:00:01Z');
+      const samples = [
+        {
+          type: 'ac',
+          table: telemetrySchema.telemetryAc,
+          fields: { v1: '220', a1: '10', fp1: '0.99', rssi: '-60' },
+        },
+        {
+          type: 'dc',
+          table: telemetrySchema.telemetryDc,
+          fields: {
+            vdc1: '12',
+            cc1: '1',
+            vdc2: '24',
+            cc2: '2',
+            vdc3: '36',
+            cc3: '3',
+            rssi: '-65',
+          },
+        },
+        {
+          type: 'env',
+          table: telemetrySchema.telemetryEnv,
+          fields: {
+            temp: '25',
+            humidity: '60',
+            solar: '100',
+            light: '200',
+            wind: '2',
+            h2: '0',
+            rssi: '-70',
+          },
+        },
+      ] as const;
+      for (const sample of samples) {
+        const device = await deviceService.create(parent.admin.id, {
+          sectorId: parent.sector.id,
+          name: sample.type + ' main',
+          deviceType: sample.type,
+        });
+        // Same measurement time: createdAt wins before UUID.
+        await db.insert(sample.table).values({
+          ...sample.fields,
+          deviceId: device.id,
+          time: measuredAt,
+          createdAt: new Date(receivedAt.getTime() - 1000),
+          id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        });
+        const [firstTie] = await db
+          .insert(sample.table)
+          .values({
+            ...sample.fields,
+            deviceId: device.id,
+            time: measuredAt,
+            createdAt: receivedAt,
+            id: '00000000-0000-4000-8000-000000000001',
+          })
+          .returning();
+        expect(
+          (await deviceService.findOne(parent.admin.id, device.id))
+            .latestTelemetry,
+        ).toEqual(firstTie);
+        const [latest] = await db
+          .insert(sample.table)
+          .values({
+            ...sample.fields,
+            deviceId: device.id,
+            time: measuredAt,
+            createdAt: receivedAt,
+            id: '00000000-0000-4000-8000-000000000002',
+          })
+          .returning();
+        // A delayed older measurement must not replace the latest measurement.
+        await db.insert(sample.table).values({
+          ...sample.fields,
+          deviceId: device.id,
+          time: new Date(measuredAt.getTime() - 60_000),
+          createdAt: new Date(receivedAt.getTime() + 60_000),
+        });
+        expected.set(device.id, latest);
+
+        // Two devices of the same type must each receive their own latest row.
+        const sibling = await deviceService.create(parent.admin.id, {
+          sectorId: parent.sector.id,
+          name: sample.type + ' sibling',
+          deviceType: sample.type,
+        });
+        const [siblingReading] = await db
+          .insert(sample.table)
+          .values({
+            ...sample.fields,
+            deviceId: sibling.id,
+            time: measuredAt,
+          })
+          .returning();
+        expected.set(sibling.id, siblingReading);
+      }
+      const foreignDevice = await deviceService.create(foreign.admin.id, {
+        sectorId: foreign.sector.id,
+        name: 'Foreign AC',
+        deviceType: 'ac',
+      });
+      const [foreignReading] = await db
+        .insert(telemetrySchema.telemetryAc)
+        .values({
+          deviceId: foreignDevice.id,
+          time: measuredAt,
+          v1: '999',
+        })
+        .returning();
+      for (const actorId of [parent.admin.id, reader.id]) {
+        const list = await deviceService.findAll(actorId, {
+          installationId: parent.installation.id,
+          sectorId: parent.sector.id,
+        });
+        expect(list.data).toHaveLength(6);
+        expect(list.pagination).toMatchObject({ total: 6, totalPages: 1 });
+        for (const device of list.data) {
+          expect(device.latestTelemetry).toEqual(expected.get(device.id));
+          expect(
+            (await deviceService.findOne(actorId, device.id)).latestTelemetry,
+          ).toEqual(expected.get(device.id));
+        }
+        const page = await deviceService.findAll(actorId, {
+          limit: '1',
+          page: '2',
+        });
+        expect(page.data).toHaveLength(1);
+        expect(page.data[0].id).toBe(list.data[1].id);
+        expect(page.data[0].latestTelemetry).toEqual(
+          expected.get(page.data[0].id),
+        );
+        expect(page.pagination).toMatchObject({ total: 6, totalPages: 6 });
+        expect(
+          (
+            await deviceService.findAll(actorId, {
+              sectorId: foreign.sector.id,
+            })
+          ).data,
+        ).toEqual([]);
+        await expect(
+          deviceService.findOne(actorId, foreignDevice.id),
+        ).rejects.toMatchObject({ status: 403 });
+      }
+      const rootList = await deviceService.findAll(rootId, {
+        companyId: foreign.company.id,
+      });
+      expect(rootList.data).toHaveLength(1);
+      expect(rootList.data[0].latestTelemetry).toEqual(foreignReading);
+    });
+
+    it('returns explicit null for missing or unsupported telemetry and follows the current device type', async () => {
+      const parent = await deviceParent();
+      for (const type of ['ac', 'dc', 'env', 'act', 'adv']) {
+        const device = await deviceService.create(parent.admin.id, {
+          sectorId: parent.sector.id,
+          name: 'Empty ' + type,
+          deviceType: type,
+        });
+        expect(
+          (await deviceService.findOne(parent.admin.id, device.id))
+            .latestTelemetry,
+        ).toBeNull();
+      }
+      const list = await deviceService.findAll(parent.admin.id);
+      expect(list.data).toHaveLength(5);
+      expect(list.data.every((device) => device.latestTelemetry === null)).toBe(
+        true,
+      );
+      expect(
+        (await deviceService.findAll(parent.admin.id, { page: '2' })).data,
+      ).toEqual([]);
+
+      const ac = list.data.find((device) => device.deviceType === 'ac')!;
+      await db.insert(telemetrySchema.telemetryAc).values({
+        deviceId: ac.id,
+        time: new Date(),
+        v1: '220',
+      });
+      await deviceService.update(parent.admin.id, ac.id, {
+        status: 'inactive',
+      });
+      expect(
+        (await deviceService.findOne(parent.admin.id, ac.id)).latestTelemetry,
+      ).toMatchObject({ v1: '220' });
+      // Readings from the former type must not appear as current-type readings.
+      await deviceService.update(parent.admin.id, ac.id, { deviceType: 'dc' });
+      expect(
+        (await deviceService.findOne(parent.admin.id, ac.id)).latestTelemetry,
+      ).toBeNull();
+      for (const deviceType of ['act', 'adv']) {
+        await deviceService.update(parent.admin.id, ac.id, { deviceType });
+        expect(
+          (await deviceService.findOne(parent.admin.id, ac.id)).latestTelemetry,
+        ).toBeNull();
+      }
+    });
+
     it('supports multiple devices per sector and queries both relation directions', async () => {
       const parent = await deviceParent();
       const first = await deviceService.create(parent.admin.id, {
