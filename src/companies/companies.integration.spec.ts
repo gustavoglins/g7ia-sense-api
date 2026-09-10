@@ -1137,6 +1137,131 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       }
     });
 
+    it('filters and paginates devices with sector and installation context without leaking other companies', async () => {
+      const a = await deviceParent();
+      const b = await deviceParent();
+      const extraSector = await sectorService.create(a.admin.id, {
+        installationId: a.installation.id,
+        name: 'Filter sector ' + randomUUID(),
+      });
+      const reader = await users.create(a.admin.id, {
+        name: 'Reader',
+        username: 'filter+reader@' + a.company.usernameSuffix,
+        password,
+      });
+      const first = await deviceService.create(a.admin.id, {
+        sectorId: a.sector.id,
+        name: 'A device',
+        deviceType: 'ac',
+      });
+      const second = await deviceService.create(a.admin.id, {
+        sectorId: extraSector.id,
+        name: 'B device',
+        deviceType: 'dc',
+      });
+      const other = await deviceService.create(b.admin.id, {
+        sectorId: b.sector.id,
+        name: 'Other',
+        deviceType: 'env',
+      });
+      for (const actor of [a.admin.id, reader.id]) {
+        const page = await deviceService.findAll(actor, {
+          installationId: a.installation.id,
+          limit: '1',
+        });
+        expect(page).toMatchObject({
+          data: [
+            {
+              id: first.id,
+              sector: { id: a.sector.id, name: a.sector.name },
+              installation: {
+                id: a.installation.id,
+                name: a.installation.name,
+              },
+              apiKeys: first.apiKeys,
+            },
+          ],
+          pagination: { page: 1, limit: 1, total: 2, totalPages: 2 },
+        });
+        expect(
+          (
+            await deviceService.findAll(actor, { limit: '1', page: '2' })
+          ).data.map((d) => d.id),
+        ).toEqual([second.id]);
+        expect(
+          (await deviceService.findAll(actor, { page: '3', limit: '1' })).data,
+        ).toEqual([]);
+        expect(
+          (
+            await deviceService.findAll(actor, { sectorId: extraSector.id })
+          ).data.map((d) => d.id),
+        ).toEqual([second.id]);
+        expect(await deviceService.findOne(actor, first.id)).toMatchObject({
+          sector: page.data[0].sector,
+          installation: page.data[0].installation,
+        });
+        for (const filters of [
+          { installationId: b.installation.id },
+          { sectorId: b.sector.id },
+          { installationId: a.installation.id, sectorId: b.sector.id },
+          { installationId: randomUUID() },
+        ]) {
+          expect(await deviceService.findAll(actor, filters)).toMatchObject({
+            data: [],
+            pagination: { total: 0, totalPages: 0 },
+          });
+        }
+        await expect(
+          deviceService.findAll(actor, { companyId: b.company.id }),
+        ).rejects.toMatchObject({ status: 403 });
+        expect(
+          (
+            await sectorService.findAll(actor, {
+              installationId: a.installation.id,
+            })
+          )
+            .map((s) => s.id)
+            .sort(),
+        ).toEqual([a.sector.id, extraSector.id].sort());
+        expect(
+          await sectorService.findAll(actor, {
+            installationId: b.installation.id,
+          }),
+        ).toEqual([]);
+      }
+      expect(
+        (
+          await deviceService.findAll(rootId, { companyId: b.company.id })
+        ).data.map((d) => d.id),
+      ).toEqual([other.id]);
+      expect(
+        (
+          await sectorService.findAll(rootId, {
+            installationId: b.installation.id,
+          })
+        ).map((s) => s.id),
+      ).toEqual([b.sector.id]);
+      for (const query of [
+        { page: '0' },
+        { page: '-1' },
+        { page: '1.5' },
+        { page: ['1', '2'] },
+        { limit: '101' },
+        { limit: '0' },
+        { limit: '' },
+        { installationId: 'invalid' },
+        { sectorId: [a.sector.id] },
+        { companyId: 'invalid' },
+        { unexpected: 'true' },
+      ])
+        await expect(
+          deviceService.findAll(a.admin.id, query),
+        ).rejects.toMatchObject({ status: 400 });
+      await expect(
+        sectorService.findAll(a.admin.id, { installationId: 'invalid' }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
     it('supports multiple devices per sector and queries both relation directions', async () => {
       const parent = await deviceParent();
       const first = await deviceService.create(parent.admin.id, {
@@ -1195,7 +1320,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       });
       for (const actorId of [a.admin.id, reader.id]) {
         expect(
-          (await deviceService.findAll(actorId)).map((item) => item.id),
+          (await deviceService.findAll(actorId)).data.map((item) => item.id),
         ).toEqual([own.id]);
         expect((await deviceService.findOne(actorId, own.id)).id).toBe(own.id);
         await expect(
@@ -1241,7 +1366,9 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         ).serialNumber,
       ).toBe('UPDATED');
       expect(
-        (await deviceService.findAll(rootId)).map((item) => item.id),
+        (await deviceService.findAll(rootId, { limit: '100' })).data.map(
+          (item) => item.id,
+        ),
       ).toEqual(expect.arrayContaining([own.id, other.id]));
       await deviceService.remove(rootId, other.id);
       await expect(
@@ -1394,11 +1521,13 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       ).resolves.toMatchObject({
         apiKeys: created.apiKeys,
       });
-      await expect(deviceService.findAll(parent.admin.id)).resolves.toEqual(
-        expect.arrayContaining([
+      await expect(
+        deviceService.findAll(parent.admin.id),
+      ).resolves.toMatchObject({
+        data: expect.arrayContaining([
           expect.objectContaining({ id: created.id, apiKeys: created.apiKeys }),
         ]),
-      );
+      });
     });
 
     it('enforces exactly one READ and one WRITE key per device at commit', async () => {

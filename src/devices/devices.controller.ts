@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
+  Query,
 } from '@nestjs/common';
 import { Session } from '@thallesp/nestjs-better-auth';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
@@ -27,8 +28,11 @@ export class DevicesController {
   }
 
   @Get()
-  findAll(@Session() session: UserSession) {
-    return this.devicesService.findAll(session.user.id);
+  findAll(
+    @Session() session: UserSession,
+    @Query() query: Record<string, unknown>,
+  ) {
+    return this.devicesService.findAll(session.user.id, query);
   }
 
   @Get(':id')

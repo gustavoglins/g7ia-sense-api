@@ -27,7 +27,8 @@ Remove-Item Env:SEED_ADMIN_PASSWORD
 
 O seed imprime as chaves dos devices DC e ENV quando os cria. As três chaves
 também podem ser consultadas em `GET /api/devices`, usando uma sessão autenticada;
-copie o valor `apiKeys.write` correspondente a cada device.
+copie o valor `apiKeys.write` correspondente a cada device no array `data`
+da resposta paginada.
 
 ## Configuração
 

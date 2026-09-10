@@ -337,6 +337,54 @@ await db.query.devices.findFirst({
 
 A migração `0009_sector_devices` cria a tabela, os enums declarados no schema, a chave estrangeira e o índice. Aplique com `npm run db:migrate`.
 
+### Listagem de devices para a interface
+
+`GET /api/devices` aceita `installationId`, `sectorId`, `companyId`,
+`page` e `limit`. Os IDs devem ser UUIDs. `page` começa em 1 e `limit`
+é 20 por padrão, com máximo de 100. Parâmetros inválidos retornam 400.
+Os resultados são ordenados por nome e, em caso de empate, por ID.
+
+```http
+GET /api/devices?installationId=UUID&sectorId=UUID&page=1&limit=20
+```
+
+O retorno agora é um objeto (antes era um array):
+
+```json
+{
+  "data": [
+    {
+      "id": "device-uuid",
+      "name": "Medidor inicial",
+      "deviceType": "ac",
+      "status": "active",
+      "sectorId": "sector-uuid",
+      "sector": { "id": "sector-uuid", "name": "Geral" },
+      "installation": { "id": "installation-uuid", "name": "Matriz" },
+      "apiKeys": { "read": "g7_read_...", "write": "g7_write_..." }
+    }
+  ],
+  "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+}
+```
+
+Os demais campos cadastrais continuam no device. `GET /api/devices/:id`
+também inclui `sector` e `installation`, retornando um único objeto.
+No frontend, use `response.data` para a lista e `response.pagination`
+para os controles de página.
+
+Os filtros são combinados: instalação e setor incompatíveis retornam lista
+vazia. Filtros que não encontram devices retornam `total: 0` e
+`totalPages: 0`. Uma página além da última retorna `data: []` com o total
+real do filtro. Admin e user continuam restritos à empresa da sessão;
+um `companyId` de outra empresa retorna 403. Super admin pode usar
+`companyId` para selecionar qualquer empresa.
+
+Para os seletores, use `GET /api/installations` e
+`GET /api/sectors?installationId=UUID`. Setores continuam retornando um
+array, ordenado por nome e ID, com o mesmo isolamento por empresa.
+Ao trocar a instalação, limpe o setor selecionado e volte à primeira página.
+
 ### Chaves de API do device
 
 Ao criar um device, a API gera duas chaves criptograficamente aleatórias:

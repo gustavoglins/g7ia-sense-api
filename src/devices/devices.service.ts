@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { eq, getTableColumns, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection.js';
 import { assertManage, assertRead, loadActor } from '../auth/roles.js';
@@ -14,6 +14,11 @@ import { sectors } from '../sectors/sectors.schema.js';
 import { deviceApiKeys, devices } from './devices.schema.js';
 import { CreateDeviceDto, deviceFields } from './dto/create-device.dto.js';
 import { generateDeviceApiKey } from './device-api-keys.js';
+import {
+  listQuery,
+  optionalUuid,
+  positiveInteger,
+} from '../common/list-query.js';
 
 @Injectable()
 export class DevicesService {
@@ -65,24 +70,70 @@ export class DevicesService {
     });
   }
 
-  async findAll(actorId: string) {
+  async findAll(actorId: string, input: unknown = {}) {
     const actor = await loadActor(this.db, actorId);
+    const query = listQuery(input, [
+      'installationId',
+      'sectorId',
+      'companyId',
+      'page',
+      'limit',
+    ]);
+    const installationId = optionalUuid(query, 'installationId');
+    const sectorId = optionalUuid(query, 'sectorId');
+    const companyId = optionalUuid(query, 'companyId');
+    if (companyId) assertRead(actor, companyId);
+    const page = positiveInteger(query, 'page', 1);
+    const limit = positiveInteger(query, 'limit', 20, 100);
+    const offset = (page - 1) * limit;
+    if (!Number.isSafeInteger(offset))
+      throw new BadRequestException('page fora do intervalo permitido.');
+    const where = and(
+      actor.role === 'super_admin'
+        ? undefined
+        : eq(installations.companyId, actor.companyId),
+      companyId ? eq(installations.companyId, companyId) : undefined,
+      installationId ? eq(installations.id, installationId) : undefined,
+      sectorId ? eq(sectors.id, sectorId) : undefined,
+    );
     const result = await this.db
-      .select(getTableColumns(devices))
+      .select({
+        ...getTableColumns(devices),
+        sector: { id: sectors.id, name: sectors.name },
+        installation: { id: installations.id, name: installations.name },
+      })
       .from(devices)
       .innerJoin(sectors, eq(devices.sectorId, sectors.id))
       .innerJoin(installations, eq(sectors.installationId, installations.id))
-      .where(
-        actor.role === 'super_admin'
-          ? undefined
-          : eq(installations.companyId, actor.companyId),
-      );
-    return this.withApiKeys(result);
+      .where(where)
+      .orderBy(asc(devices.name), asc(devices.id))
+      .limit(limit)
+      .offset(offset);
+    const [totals] = await this.db
+      .select({ total: count() })
+      .from(devices)
+      .innerJoin(sectors, eq(devices.sectorId, sectors.id))
+      .innerJoin(installations, eq(sectors.installationId, installations.id))
+      .where(where);
+    return {
+      data: await this.withApiKeys(result),
+      pagination: {
+        page,
+        limit,
+        total: totals.total,
+        totalPages: Math.ceil(totals.total / limit),
+      },
+    };
   }
 
   private async findWithCompany(id: string) {
     const [record] = await this.db
-      .select({ device: devices, companyId: installations.companyId })
+      .select({
+        device: devices,
+        companyId: installations.companyId,
+        sector: { id: sectors.id, name: sectors.name },
+        installation: { id: installations.id, name: installations.name },
+      })
       .from(devices)
       .innerJoin(sectors, eq(devices.sectorId, sectors.id))
       .innerJoin(installations, eq(sectors.installationId, installations.id))
@@ -95,7 +146,15 @@ export class DevicesService {
     const actor = await loadActor(this.db, actorId);
     const record = await this.findWithCompany(id);
     assertRead(actor, record.companyId);
-    return (await this.withApiKeys([record.device]))[0];
+    return (
+      await this.withApiKeys([
+        {
+          ...record.device,
+          sector: record.sector,
+          installation: record.installation,
+        },
+      ])
+    )[0];
   }
 
   async update(actorId: string, id: string, body: unknown) {

@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { eq, getTableColumns } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection.js';
 import { assertManage, assertRead, loadActor } from '../auth/roles.js';
@@ -13,6 +13,7 @@ import { inputObject, requiredText } from '../common/input.js';
 import { installations } from '../installations/installations.schema.js';
 import { sectors } from './sectors.schema.js';
 import { CreateSectorDto } from './dto/create-sector.dto.js';
+import { listQuery, optionalUuid } from '../common/list-query.js';
 
 @Injectable()
 export class SectorsService {
@@ -60,17 +61,23 @@ export class SectorsService {
     });
   }
 
-  async findAll(actorId: string) {
+  async findAll(actorId: string, input: unknown = {}) {
     const actor = await loadActor(this.db, actorId);
+    const query = listQuery(input, ['installationId']);
+    const installationId = optionalUuid(query, 'installationId');
     return this.db
       .select(getTableColumns(sectors))
       .from(sectors)
       .innerJoin(installations, eq(sectors.installationId, installations.id))
       .where(
-        actor.role === 'super_admin'
-          ? undefined
-          : eq(installations.companyId, actor.companyId),
-      );
+        and(
+          actor.role === 'super_admin'
+            ? undefined
+            : eq(installations.companyId, actor.companyId),
+          installationId ? eq(installations.id, installationId) : undefined,
+        ),
+      )
+      .orderBy(asc(sectors.name), asc(sectors.id));
   }
 
   private async findWithCompany(id: string) {
