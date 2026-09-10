@@ -389,11 +389,11 @@ X-API-Key: g7_write_...
 
 A chave identifica o device; seu tipo determina a tabela e os campos aceitos:
 
-| Tipo | Tabela | Medições opcionais (strings ou null) |
-| --- | --- | --- |
-| ac | telemetry_ac | v1, a1, fp1, rssi |
-| env | telemetry_env | temp, humidity, solar, light, wind, h2, rssi |
-| dc | telemetry_dc | vdc1, cc1, vdc2, cc2, vdc3, cc3, rssi |
+| Tipo | Tabela        | Medições opcionais (strings ou null)         |
+| ---- | ------------- | -------------------------------------------- |
+| ac   | telemetry_ac  | v1, a1, fp1, rssi                            |
+| env  | telemetry_env | temp, humidity, solar, light, wind, h2, rssi |
+| dc   | telemetry_dc  | vdc1, cc1, vdc2, cc2, vdc3, cc3, rssi        |
 
 `time` é obrigatório e deve ser uma data válida em ISO 8601, com segundos e fuso
 horário (`Z` ou offset), podendo incluir até três casas de milissegundos.
@@ -416,6 +416,12 @@ telemetrias em cascata. A escolha da tabela pelo tipo é validada pela API.
 Este módulo disponibiliza apenas o POST; consultas com chave READ não estão implementadas.
 Como os GETs de devices retornam ambas as chaves, usuários com acesso a esses GETs
 também podem obter a chave WRITE e enviar medições.
+
+Um simulador independente dos devices AC, DC e ENV da seed está disponível em
+[`device-simulator`](device-simulator/README.md). Cada instância funciona como um
+equipamento IoT: usa somente a URL pública da telemetria e sua chave WRITE
+configurada no próprio `.env`, sem importar código nem acessar o banco da API.
+As flags do `.env` permitem ligar e desligar cada tipo separadamente.
 
 A migração `0013_remove_soft_delete_fields` remove definitivamente a coluna
 `deleted_at` de empresas, instalações, setores e devices. Os endpoints `DELETE`

@@ -19,8 +19,8 @@ export const devicesTypes = pgEnum('devices_types', [
   'ac',
   'dc',
   'env',
-  'act',
   'adv',
+  'act',
 ]);
 export const devicesStatus = pgEnum('devices_status', ['active', 'inactive']);
 export const deviceApiKeyType = pgEnum('device_api_key_type', [

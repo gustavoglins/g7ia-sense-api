@@ -28,7 +28,7 @@ import { TelemetryModule } from './telemetry/telemetry.module.js';
             provider: 'pg',
           }),
           // trustedOrigins: [configService.getOrThrow('FRONTEND_URL')],
-          trustedOrigins: ['*'],
+          trustedOrigins: ['http://localhost:3001'],
         }),
       }),
       inject: [DATABASE_CONNECTION, ConfigService],

@@ -31,6 +31,20 @@
             "serialNumber": "DEMO-G7I-001",
             "version": "1.0",
             "status": "active"
+          },
+          {
+            "name": "Medidor DC",
+            "devicesType": "dc",
+            "serialNumber": "DEMO-G7I-DC-001",
+            "version": "1.0",
+            "status": "active"
+          },
+          {
+            "name": "Sensor ambiental",
+            "devicesType": "env",
+            "serialNumber": "DEMO-G7I-ENV-001",
+            "version": "1.0",
+            "status": "active"
           }
         ]
       }
