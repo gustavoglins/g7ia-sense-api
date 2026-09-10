@@ -42,7 +42,7 @@ export class TelemetryService {
   }
 
   async create(device: TelemetryDevice, body: unknown) {
-    const type = device.devicesType;
+    const type = device.deviceType;
     if (type !== 'ac' && type !== 'env' && type !== 'dc')
       throw new BadRequestException('Tipo de device sem suporte a telemetria.');
     const input = inputObject(body);

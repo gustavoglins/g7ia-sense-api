@@ -75,7 +75,7 @@ export async function seedInitialCompany(db: NodePgDatabase, input: unknown) {
     }
     const deviceData = (
       deviceInput === undefined
-        ? [{ name: 'Device inicial', devicesType: 'ac', status: sector.status }]
+        ? [{ name: 'Device inicial', deviceType: 'ac', status: sector.status }]
         : (deviceInput as unknown[])
     ).map((device) => CreateDeviceDto.parse(device));
     if (

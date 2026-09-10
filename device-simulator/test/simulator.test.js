@@ -18,25 +18,25 @@ describe('device simulator', () => {
   it('configures one AC, one DC and one ENV device from the API seed', async () => {
     const devices = await loadDeviceConfig();
     assert.deepEqual(
-      devices.map(({ name, devicesType, serialNumber }) => ({
+      devices.map(({ name, deviceType, serialNumber }) => ({
         name,
-        devicesType,
+        deviceType,
         serialNumber,
       })),
       [
         {
           name: 'Medidor inicial',
-          devicesType: 'ac',
+          deviceType: 'ac',
           serialNumber: 'DEMO-G7I-001',
         },
         {
           name: 'Medidor DC',
-          devicesType: 'dc',
+          deviceType: 'dc',
           serialNumber: 'DEMO-G7I-DC-001',
         },
         {
           name: 'Sensor ambiental',
-          devicesType: 'env',
+          deviceType: 'env',
           serialNumber: 'DEMO-G7I-ENV-001',
         },
       ],

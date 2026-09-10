@@ -99,6 +99,13 @@
       "when": 1788985623507,
       "tag": "0013_remove_soft_delete_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789019215918,
+      "tag": "0014_rename_device_type",
+      "breakpoints": true
     }
   ]
 }

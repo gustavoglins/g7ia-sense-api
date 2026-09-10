@@ -102,7 +102,7 @@ Cada setor pode configurar uma lista não vazia de `devices`:
         "devices": [
           {
             "name": "Medidor inicial",
-            "devicesType": "ac",
+            "deviceType": "ac",
             "serialNumber": "DEMO-G7I-001",
             "version": "1.0",
             "status": "active"
@@ -114,7 +114,7 @@ Cada setor pode configurar uma lista não vazia de `devices`:
 }
 ```
 
-Sem `devices`, o seed cria um `Device inicial` do tipo `ac` em cada setor, com o status do setor. Devices explicitamente configurados no JSON devem informar `devicesType`. Os dados do exemplo são demonstrativos; o seed apenas cadastra registros, sem conectar equipamentos físicos. `serialNumber`, `version` e `macAddress` são opcionais.
+Sem `devices`, o seed cria um `Device inicial` do tipo `ac` em cada setor, com o status do setor. Devices explicitamente configurados no JSON devem informar `deviceType`. Os dados do exemplo são demonstrativos; o seed apenas cadastra registros, sem conectar equipamentos físicos. `serialNumber`, `version` e `macAddress` são opcionais.
 
 Devices do seed são reconhecidos por **setor + nome**. Reexecutar cria apenas os faltantes e preserva os dados existentes. Nomes iguais em setores diferentes são permitidos; nomes repetidos na mesma lista são rejeitados. Se já houver vários devices com o mesmo nome no mesmo setor, o seed falha por ambiguidade sem salvar alterações. Alterar o nome no JSON representa outro device. O `sectorId` é sempre atribuído pelo seed, e a saída informa IDs e quais devices foram criados.
 
@@ -298,7 +298,7 @@ Rotas autenticadas:
 
 - `POST /api/devices`: cadastra um device em um setor existente.
 - `GET /api/devices` e `GET /api/devices/:id`: consultam os devices permitidos para a conta.
-- `PATCH /api/devices/:id`: aceita `name`, `devicesType`, `serialNumber`, `version`, `macAddress` e/ou `status`. O vínculo `sectorId` não pode ser alterado nessa rota.
+- `PATCH /api/devices/:id`: aceita `name`, `deviceType`, `serialNumber`, `version`, `macAddress` e/ou `status`. O vínculo `sectorId` não pode ser alterado nessa rota.
 - `DELETE /api/devices/:id`: exclui um device.
 
 `super_admin` consulta e gerencia todos; `admin` consulta e gerencia apenas devices da própria empresa; `user` apenas consulta devices da própria empresa. IDs nas URLs são UUIDs.
@@ -309,7 +309,7 @@ Exemplo de `POST /api/devices`:
 {
   "sectorId": "UUID-do-setor",
   "name": "Medidor principal",
-  "devicesType": "ac",
+  "deviceType": "ac",
   "serialNumber": "SN-001",
   "version": "1.0",
   "macAddress": "00:11:22:33:44:55",
@@ -317,7 +317,7 @@ Exemplo de `POST /api/devices`:
 }
 ```
 
-`name`, `sectorId` e `devicesType` são obrigatórios. Os tipos permitidos são `ac`, `dc`, `env`, `act` e `adv`; não há tipo padrão na API ou no banco. O status padrão é `active`; `serialNumber`, `version` e `macAddress` são opcionais. Excluir um setor remove seus devices em cascata, inclusive quando a exclusão começa pela instalação ou pela empresa.
+`name`, `sectorId` e `deviceType` são obrigatórios. Os tipos permitidos são `ac`, `dc`, `env`, `act` e `adv`; não há tipo padrão na API ou no banco. O status padrão é `active`; `serialNumber`, `version` e `macAddress` são opcionais. Excluir um setor remove seus devices em cascata, inclusive quando a exclusão começa pela instalação ou pela empresa.
 
 A migração `0010_required_device_type` adiciona a coluna `devices_type` obrigatória. Se a tabela já contiver devices, adapte essa migração antes de executá-la: adicione a coluna permitindo nulos, preencha cada registro com o tipo correto e então aplique `SET NOT NULL`. Nenhum tipo é inferido automaticamente para equipamentos existentes. O seed preserva registros existentes e não faz esse preenchimento retroativo.
 
@@ -351,7 +351,7 @@ Exemplo resumido da resposta de `POST /api/devices`:
   "id": "UUID-do-device",
   "sectorId": "UUID-do-setor",
   "name": "Medidor principal",
-  "devicesType": "ac",
+  "deviceType": "ac",
   "status": "active",
   "apiKeys": {
     "read": "g7_read_...",
@@ -427,6 +427,13 @@ A migração `0013_remove_soft_delete_fields` remove definitivamente a coluna
 `deleted_at` de empresas, instalações, setores e devices. Os endpoints `DELETE`
 apagam os registros do banco; as chaves estrangeiras removem em cascata os dados
 dependentes, incluindo chaves de API e telemetrias.
+
+A migração `0014_rename_device_type` renomeia a coluna `devices_type` para
+`device_type`, preservando os valores existentes e o enum PostgreSQL.
+POST, PATCH e GET de devices passam a usar `deviceType`, com exatamente uma
+string: `ac`, `dc`, `env`, `act` ou `adv`. Listas não são aceitas.
+Atualize clientes e arquivos de seed personalizados que ainda usam `devicesType`.
+Aplique a migração antes de iniciar a API atualizada.
 
 ## Migrações
 

@@ -15,12 +15,12 @@ import {
   telemetryEnv,
 } from '../telemetry/telemetry.schema.js';
 
-export const devicesTypes = pgEnum('devices_types', [
+export const deviceTypes = pgEnum('devices_types', [
   'ac',
   'dc',
   'env',
-  'adv',
   'act',
+  'adv',
 ]);
 export const devicesStatus = pgEnum('devices_status', ['active', 'inactive']);
 export const deviceApiKeyType = pgEnum('device_api_key_type', [
@@ -37,7 +37,7 @@ export const devices = pgTable(
       .references(() => sectors.id, { onDelete: 'cascade' }),
 
     name: varchar('name', { length: 255 }).notNull(),
-    devicesType: devicesTypes('devices_type').notNull(),
+    deviceType: deviceTypes('device_type').notNull(),
     serialNumber: varchar('serial_number', { length: 255 }),
     version: varchar('version', { length: 255 }),
     macAddress: varchar('mac_address', { length: 255 }),

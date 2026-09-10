@@ -23,16 +23,16 @@ export async function loadDeviceConfig(
     if (
       !device ||
       typeof device !== 'object' ||
-      !['ac', 'dc', 'env'].includes(device.devicesType) ||
+      !['ac', 'dc', 'env'].includes(device.deviceType) ||
       typeof device.name !== 'string' ||
       !device.name.trim() ||
-      types.has(device.devicesType)
+      types.has(device.deviceType)
     ) {
       throw new Error(
         'device.config.json deve configurar exatamente um device ac, um dc e um env.',
       );
     }
-    types.add(device.devicesType);
+    types.add(device.deviceType);
   }
   if (types.size !== 3) {
     throw new Error(
@@ -44,17 +44,17 @@ export async function loadDeviceConfig(
 
 export function resolveEnabledDevices(devices, environment = process.env) {
   return devices.flatMap((device) => {
-    const prefix = `DEVICE_${device.devicesType.toUpperCase()}`;
+    const prefix = `DEVICE_${device.deviceType.toUpperCase()}`;
     const enabled = booleanSetting(
       environment[`${prefix}_ENABLED`],
-      device.devicesType === 'ac',
+      device.deviceType === 'ac',
       `${prefix}_ENABLED`,
     );
     if (!enabled) return [];
 
     const writeKey =
       environment[`${prefix}_WRITE_API_KEY`] ??
-      (device.devicesType === 'ac'
+      (device.deviceType === 'ac'
         ? environment.DEVICE_WRITE_API_KEY
         : undefined);
     if (!writeKey) {
@@ -147,7 +147,7 @@ export async function runSimulator({
   onError = console.error,
 }) {
   while (!signal.aborted) {
-    const telemetry = generateTelemetry(device.devicesType);
+    const telemetry = generateTelemetry(device.deviceType);
     try {
       const created = await sendTelemetry({
         apiUrl,
@@ -187,7 +187,7 @@ async function main() {
   );
   for (const { device } of enabledDevices) {
     console.log(
-      `- ${device.name} (${device.devicesType.toUpperCase()}, ${device.serialNumber}): ligado`,
+      `- ${device.name} (${device.deviceType.toUpperCase()}, ${device.serialNumber}): ligado`,
     );
   }
 

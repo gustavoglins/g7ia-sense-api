@@ -515,18 +515,18 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
               name: 'Device Seed Sector A',
               devices: [
                 {
-                  devicesType: 'ac',
+                  deviceType: 'ac',
                   name: 'Meter',
                   serialNumber: 'ORIGINAL',
                   version: '1.0',
                   macAddress: '00:11:22:33:44:55',
                 },
-                { devicesType: 'ac', name: 'Sensor', status: 'inactive' },
+                { deviceType: 'ac', name: 'Sensor', status: 'inactive' },
               ],
             },
             {
               name: 'Device Seed Sector B',
-              devices: [{ devicesType: 'ac', name: 'Meter' }],
+              devices: [{ deviceType: 'ac', name: 'Meter' }],
             },
           ],
         },
@@ -629,7 +629,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
           sectors: [
             {
               name: 'Ambiguous Seed Sector',
-              devices: [{ devicesType: 'ac', name: 'Meter' }],
+              devices: [{ deviceType: 'ac', name: 'Meter' }],
             },
           ],
         },
@@ -638,7 +638,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       await deviceService.create(rootId, {
         sectorId: first.sectors[0].id,
         name: 'Meter',
-        devicesType: 'ac',
+        deviceType: 'ac',
       });
       await expect(
         seedInitialCompany(db, {
@@ -648,8 +648,8 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
               {
                 name: 'Ambiguous Seed Sector',
                 devices: [
-                  { devicesType: 'ac', name: 'Should Roll Back' },
-                  { devicesType: 'ac', name: 'Meter' },
+                  { deviceType: 'ac', name: 'Should Roll Back' },
+                  { deviceType: 'ac', name: 'Meter' },
                 ],
               },
             ],
@@ -1055,7 +1055,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
           const device = await deviceService.create(parent.admin.id, {
             sectorId: parent.sector.id,
             name: sample.type,
-            devicesType: sample.type,
+            deviceType: sample.type,
           });
           const send = (body: unknown, key = device.apiKeys.write) =>
             request(app.getHttpServer())
@@ -1124,7 +1124,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
           const device = await deviceService.create(parent.admin.id, {
             sectorId: parent.sector.id,
             name: type,
-            devicesType: type,
+            deviceType: type,
           });
           await request(app.getHttpServer())
             .post('/api/telemetry')
@@ -1140,7 +1140,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
     it('supports multiple devices per sector and queries both relation directions', async () => {
       const parent = await deviceParent();
       const first = await deviceService.create(parent.admin.id, {
-        devicesType: 'ac',
+        deviceType: 'ac',
         sectorId: parent.sector.id,
         name: 'Medidor 1',
         serialNumber: 'SN-1',
@@ -1148,7 +1148,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         macAddress: '00:11:22:33:44:55',
       });
       const second = await deviceService.create(rootId, {
-        devicesType: 'ac',
+        deviceType: 'ac',
         sectorId: parent.sector.id,
         name: 'Medidor 2',
       });
@@ -1179,12 +1179,12 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       const a = await deviceParent();
       const b = await deviceParent();
       const own = await deviceService.create(a.admin.id, {
-        devicesType: 'ac',
+        deviceType: 'ac',
         sectorId: a.sector.id,
         name: 'Own Device',
       });
       const other = await deviceService.create(b.admin.id, {
-        devicesType: 'ac',
+        deviceType: 'ac',
         sectorId: b.sector.id,
         name: 'Other Device',
       });
@@ -1205,7 +1205,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       for (const operation of [
         () =>
           deviceService.create(reader.id, {
-            devicesType: 'ac',
+            deviceType: 'ac',
             sectorId: a.sector.id,
             name: 'Forbidden',
           }),
@@ -1213,7 +1213,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         () => deviceService.remove(reader.id, own.id),
         () =>
           deviceService.create(a.admin.id, {
-            devicesType: 'ac',
+            deviceType: 'ac',
             sectorId: b.sector.id,
             name: 'Forbidden',
           }),
@@ -1226,7 +1226,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       ).rejects.toMatchObject({ status: 400 });
       await expect(
         deviceService.create(rootId, {
-          devicesType: 'ac',
+          deviceType: 'ac',
           sectorId: a.sector.id,
           name: 'Invalid',
           status: 'unknown',
@@ -1252,7 +1252,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
     it('requires an existing sector and cascades devices across the hierarchy', async () => {
       await expect(
         deviceService.create(rootId, {
-          devicesType: 'ac',
+          deviceType: 'ac',
           sectorId: randomUUID(),
           name: 'Unknown Sector',
         }),
@@ -1265,7 +1265,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       ).rejects.toMatchObject({ code: '23502' });
       await expect(
         db.insert(devicesSchema.devices).values({
-          devicesType: 'ac',
+          deviceType: 'ac',
           sectorId: randomUUID(),
           name: 'Invalid FK',
           status: 'active',
@@ -1274,7 +1274,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       for (const level of ['sector', 'installation', 'company']) {
         const parent = await deviceParent();
         const device = await deviceService.create(parent.admin.id, {
-          devicesType: 'ac',
+          deviceType: 'ac',
           sectorId: parent.sector.id,
           name: 'Cascade Device',
         });
@@ -1295,56 +1295,76 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       }
     });
 
-    it('requires devicesType in the API and database and accepts only the existing enum', async () => {
+    it('requires deviceType in the API and database and accepts only the existing enum', async () => {
       const parent = await deviceParent();
-      for (const devicesType of [undefined, null, '', 'unknown', 1]) {
+      for (const deviceType of [
+        undefined,
+        null,
+        '',
+        'unknown',
+        1,
+        [],
+        ['ac'],
+        ['ac', 'dc'],
+        'ac,dc',
+        { type: 'ac' },
+      ]) {
         await expect(
           deviceService.create(parent.admin.id, {
             sectorId: parent.sector.id,
             name: 'Invalid Type',
-            devicesType,
+            deviceType,
           }),
         ).rejects.toMatchObject({ status: 400 });
       }
-      for (const devicesType of ['ac', 'dc', 'env', 'act', 'adv']) {
+      for (const deviceType of ['ac', 'dc', 'env', 'act', 'adv']) {
         const created = await deviceService.create(parent.admin.id, {
           sectorId: parent.sector.id,
-          name: `Type ${devicesType}`,
-          devicesType,
+          name: `Type ${deviceType}`,
+          deviceType,
         });
-        expect(created.devicesType).toBe(devicesType);
+        expect(created.deviceType).toBe(deviceType);
+        expect(created).not.toHaveProperty('devicesType');
+        expect(
+          await deviceService.findOne(parent.admin.id, created.id),
+        ).toMatchObject({ deviceType });
         expect(
           (
             await deviceService.update(parent.admin.id, created.id, {
               name: 'Preserved Type',
             })
-          ).devicesType,
-        ).toBe(devicesType);
+          ).deviceType,
+        ).toBe(deviceType);
       }
       const device = await deviceService.create(parent.admin.id, {
         sectorId: parent.sector.id,
         name: 'Editable Type',
-        devicesType: 'ac',
+        deviceType: 'ac',
       });
       expect(
         (
           await deviceService.update(parent.admin.id, device.id, {
-            devicesType: 'dc',
+            deviceType: 'dc',
           })
-        ).devicesType,
+        ).deviceType,
       ).toBe('dc');
+      for (const deviceType of [null, [], ['ac'], ['ac', 'dc'], 'ac,dc']) {
+        await expect(
+          deviceService.update(parent.admin.id, device.id, { deviceType }),
+        ).rejects.toMatchObject({ status: 400 });
+      }
       await expect(
-        deviceService.update(parent.admin.id, device.id, { devicesType: null }),
+        deviceService.update(parent.admin.id, device.id, { devicesType: 'ac' }),
       ).rejects.toMatchObject({ status: 400 });
       await expect(
         pool.query(
           'INSERT INTO devices (sector_id, name, status) VALUES ($1, $2, $3)',
           [parent.sector.id, 'No Type', 'active'],
         ),
-      ).rejects.toMatchObject({ code: '23502', column: 'devices_type' });
+      ).rejects.toMatchObject({ code: '23502', column: 'device_type' });
       await expect(
         pool.query(
-          'INSERT INTO devices (sector_id, name, status, devices_type) VALUES ($1, $2, $3, $4)',
+          'INSERT INTO devices (sector_id, name, status, device_type) VALUES ($1, $2, $3, $4)',
           [parent.sector.id, 'Wrong Type', 'active', 'unknown'],
         ),
       ).rejects.toMatchObject({ code: '22P02' });
@@ -1355,7 +1375,7 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
       const created = await deviceService.create(parent.admin.id, {
         sectorId: parent.sector.id,
         name: 'API Key Device',
-        devicesType: 'ac',
+        deviceType: 'ac',
       });
       expect(created.apiKeys.read).toMatch(/^g7_read_[A-Za-z0-9_-]{43}$/);
       expect(created.apiKeys.write).toMatch(/^g7_write_[A-Za-z0-9_-]{43}$/);
@@ -1387,14 +1407,14 @@ describe.skipIf(!process.env.DATABASE_TEST_URL)(
         db.insert(devicesSchema.devices).values({
           sectorId: parent.sector.id,
           name: 'Missing API Keys',
-          devicesType: 'ac',
+          deviceType: 'ac',
           status: 'active',
         }),
       ).rejects.toMatchObject({ cause: { code: '23514' } });
       const created = await deviceService.create(parent.admin.id, {
         sectorId: parent.sector.id,
         name: 'Protected API Keys',
-        devicesType: 'dc',
+        deviceType: 'dc',
       });
       const [readKey] = await db
         .select()

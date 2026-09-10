@@ -1,10 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { inputObject, optionalText, requiredText } from '../../common/input.js';
-import { devicesTypes } from '../devices.schema.js';
+import { deviceTypes } from '../devices.schema.js';
 
 export const deviceFields = [
   'name',
-  'devicesType',
+  'deviceType',
   'serialNumber',
   'version',
   'macAddress',
@@ -14,7 +14,7 @@ export const deviceFields = [
 export class CreateDeviceDto {
   sectorId: string;
   name: string;
-  devicesType: (typeof devicesTypes.enumValues)[number];
+  deviceType: (typeof deviceTypes.enumValues)[number];
   serialNumber?: string | null;
   version?: string | null;
   macAddress?: string | null;
@@ -22,14 +22,14 @@ export class CreateDeviceDto {
 
   static parse(value: unknown) {
     const input = inputObject(value);
-    const devicesType = input.devicesType;
+    const deviceType = input.deviceType;
     if (
-      !devicesTypes.enumValues.includes(
-        devicesType as CreateDeviceDto['devicesType'],
+      !deviceTypes.enumValues.includes(
+        deviceType as CreateDeviceDto['deviceType'],
       )
     ) {
       throw new BadRequestException(
-        'devicesType é obrigatório e deve ser ac, dc, env, act ou adv.',
+        'deviceType é obrigatório e deve ser ac, dc, env, act ou adv.',
       );
     }
     const status = input.status ?? 'active';
@@ -37,7 +37,7 @@ export class CreateDeviceDto {
       throw new BadRequestException('status deve ser active ou inactive.');
     return {
       name: requiredText(input, 'name'),
-      devicesType: devicesType as CreateDeviceDto['devicesType'],
+      deviceType: deviceType as CreateDeviceDto['deviceType'],
       serialNumber: optionalText(input, 'serialNumber') ?? null,
       version: optionalText(input, 'version') ?? null,
       macAddress: optionalText(input, 'macAddress') ?? null,
