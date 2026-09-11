@@ -1,4 +1,46 @@
-# Empresas e autenticação
+# G7IA Sense API
+
+## Documentação Swagger
+
+Inicie a API com `npm run start:dev` e acesse:
+
+- Swagger UI: **http://localhost:3000/api/docs**
+- OpenAPI JSON: **http://localhost:3000/api/docs-json**
+- OpenAPI YAML: **http://localhost:3000/api/docs-yaml**
+
+Se `PORT` estiver configurada, use essa porta. Os documentos descrevem as rotas
+de empresas, usuários, instalações, setores, dispositivos, telemetria e o fluxo
+de login/consulta de sessão/logout do Better Auth. Incluem corpos de requisição,
+campos obrigatórios e nulos, respostas, erros, permissões e exemplos.
+
+Para testar rotas com sessão, abra **Autenticação → POST /api/auth/sign-in/username**,
+clique em **Try it out** e entre com seu username e senha. O navegador armazena o
+cookie HttpOnly e o envia nas próximas chamadas na mesma origem. O campo
+**Authorize** não cria esse cookie; faça o login pelo endpoint. A documentação
+usa o nome real do cookie configurado pelo Better Auth, inclusive em HTTPS.
+Use `POST /api/auth/sign-out` para encerrar a sessão.
+
+Para testar um dispositivo IoT, clique em **Authorize → deviceWriteKey** e cole
+a chave **WRITE** retornada ao criar/consultar o dispositivo, sem prefixo. Abra
+`POST /api/telemetry` e escolha o exemplo AC, DC ou ENV correspondente ao device.
+Essa chamada envia `x-api-key` e não exige login. Não envie `deviceId` ou
+`deviceType`: o servidor identifica ambos pela chave. As medidas são strings;
+`time` exige ISO 8601 com fuso horário. A chave READ ainda não autentica GETs.
+
+Em `GET /api/devices`, os filtros são `installationId`, `sectorId`, `companyId`,
+`page` e `limit` (padrão 20, máximo 100). O retorno inclui `data` e `pagination`;
+cada item contém instalação, setor, chaves e última telemetria. POST/PATCH de
+devices retornam somente os dados cadastrais e as chaves. DELETE é definitivo.
+
+A documentação fica em `src/documentation/`, e os decorators dos controllers
+associam cada rota ao contrato correspondente. Não altera as validações nem as
+permissões dos serviços. Os testes de documentação rodam com
+`npx vitest run src/documentation/swagger.spec.ts` e não precisam de PostgreSQL.
+
+Referências: [Swagger no NestJS](https://docs.nestjs.com/openapi/introduction) e
+[username no Better Auth](https://better-auth.com/docs/plugins/username).
+
+## Empresas e autenticação
 
 O login usa username e senha, com o plugin `username` do Better Auth.
 
