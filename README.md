@@ -40,6 +40,77 @@ permissões dos serviços. Os testes de documentação rodam com
 Referências: [Swagger no NestJS](https://docs.nestjs.com/openapi/introduction) e
 [username no Better Auth](https://better-auth.com/docs/plugins/username).
 
+## Métricas de uma instalação
+
+`GET /api/installations/:id/metrics` exige sessão e respeita as permissões de
+leitura: `admin`/`user` acessam a própria empresa; `super_admin` tem alcance global.
+ID inválido retorna 400, instalação inexistente 404 e outra empresa 403.
+
+Sem parâmetros, o período começa à meia-noite de hoje em `America/Sao_Paulo` e
+termina no momento da consulta. Para outro período, envie **from e to juntos**,
+em ISO 8601 com fuso. As leituras são selecionadas por `time >= from AND time < to`.
+Os limites retornados estão normalizados para UTC.
+
+```http
+GET /api/installations/7a1f1111-2222-4333-8444-555555555555/metrics?from=2026-09-12T00:00:00-03:00&to=2026-09-13T00:00:00-03:00
+```
+
+Exemplo de resposta:
+
+```json
+{
+  "installationId": "7a1f1111-2222-4333-8444-555555555555",
+  "period": {
+    "from": "2026-09-12T03:00:00.000Z",
+    "to": "2026-09-13T03:00:00.000Z",
+    "timeZone": "America/Sao_Paulo"
+  },
+  "metrics": {
+    "energyConsumed": {
+      "value": 1,
+      "unit": "kWh",
+      "estimated": true,
+      "samplingIntervalSeconds": 15,
+      "validSamples": 240,
+      "invalidSamples": 0,
+      "duplicateSamples": 0
+    }
+  }
+}
+```
+
+A primeira métrica é a **energia consumida estimada**, somente de dispositivos
+**AC** atualmente vinculados aos setores da instalação. ENV, DC, ACT e ADV não
+participam. Dados históricos de dispositivos inativos continuam contando;
+dispositivos/telemetrias excluídos definitivamente não podem ser recuperados.
+
+Para cada leitura válida: `kWh = v1 × a1 × fp1 × 15 / 3.600.000`, assumindo tensão
+RMS em volts, corrente RMS em amperes e fator de potência entre 0 e 1. Não há
+multiplicador trifásico: o schema atual só contém `v1/a1/fp1`. Cada leitura
+selecionada representa **15 segundos completos**, sem interpolar lacunas. O total
+é somado em precisão decimal no PostgreSQL e arredondado a 6 casas no final.
+Por exemplo, 240 leituras de 1.000 W representam 1 kWh.
+
+Strings devem conter números decimais com ponto, sem unidades, vírgula ou notação
+exponencial, com no máximo 64 caracteres após remover espaços. `v1` e `a1` devem
+ser não negativos. Medidas ausentes, inválidas ou `fp1` fora de `[0, 1]` descartam
+a leitura inteira e incrementam `invalidSamples`; não se presume `fp1 = 1`.
+Sem leituras válidas, `value` é **null**; uma leitura válida de consumo zero
+produz **0**. Isso evita confundir falta de dados com ausência de consumo.
+
+Reenvios com o mesmo `deviceId/time` contam uma vez: prevalece o maior `createdAt`,
+com desempate pelo maior `id`. Os demais incrementam `duplicateSamples`.
+Pressupõe-se que os medidores AC representam consumos independentes; somar um
+medidor geral com seus submedidores contabilizaria a mesma energia duas vezes.
+O objeto `metrics` permite adicionar outras métricas sem mudar a estrutura atual.
+
+Os testes da consulta SQL usam tabelas temporárias e uma URL de teste explícita
+`METRICS_TEST_DATABASE_URL` (nunca `DATABASE_URL`). Execute
+`npx vitest run src/installations/energy-consumption.integration.spec.ts`
+com essa variável apontando para um PostgreSQL de teste.
+
+Referência do cálculo: [potência e energia elétrica — Fluke](https://www.fluke.com/en-us/learn/blog/electrical/electrical-glossary).
+
 ## Empresas e autenticação
 
 O login usa username e senha, com o plugin `username` do Better Auth.

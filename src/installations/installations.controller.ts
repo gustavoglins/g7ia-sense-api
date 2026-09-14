@@ -7,13 +7,14 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
+  Query,
 } from '@nestjs/common';
 import { Session } from '@thallesp/nestjs-better-auth';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
 import { InstallationsService } from './installations.service.js';
 import { CreateInstallationDto } from './dto/create-installation.dto.js';
 import { UpdateInstallationDto } from './dto/update-installation.dto.js';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ApiEndpoint } from '../documentation/api-endpoint.decorator.js';
 
 @ApiTags('Instalações')
@@ -62,6 +63,36 @@ export class InstallationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.installationsService.findOne(session.user.id, id);
+  }
+
+  @Get(':id/metrics')
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    schema: { type: 'string', format: 'date-time' },
+    description:
+      'Início inclusivo, ISO 8601 com fuso. Informe junto com to. Omitidos: hoje em America/Sao_Paulo até agora.',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    schema: { type: 'string', format: 'date-time' },
+    description: 'Fim exclusivo, ISO 8601 com fuso. Deve ser posterior a from.',
+  })
+  @ApiEndpoint({
+    summary: 'Consultar métricas da instalação',
+    response: 'InstallationMetrics',
+    id: 'uuid',
+    errors: [400, 404],
+    description:
+      'Energia estimada somente dos dispositivos AC atualmente vinculados à instalação, incluindo históricos de devices inativos. Cada leitura válida representa 15 segundos: v1 × a1 × fp1 × 15 / 3600000 kWh. Seleção por time em [from, to). Lacunas não são preenchidas. Duplicatas por deviceId/time usam o registro de maior createdAt/id. As medidas devem ser strings decimais com ponto (até 64 caracteres), v1/a1 não negativos e fp1 entre 0 e 1. Sem leituras válidas: value null. Pressupõe medidores de consumo independentes, sem sobreposição.',
+  })
+  metrics(
+    @Session() session: UserSession,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: Record<string, unknown>,
+  ) {
+    return this.installationsService.metrics(session.user.id, id, query);
   }
 
   @Patch(':id')

@@ -140,7 +140,7 @@ describe('Swagger documentation', () => {
         if (item[method]) operations.push([path, method, item[method]]);
       }
     }
-    expect(operations).toHaveLength(31);
+    expect(operations).toHaveLength(32);
     const ids = new Set<string>();
     for (const [path, method, operation] of operations) {
       expect(path).toMatch(/^\/api\//);
@@ -232,6 +232,25 @@ describe('Swagger documentation', () => {
     expect(apiSchemas.UpdateCompany.required).toBeUndefined();
   });
 
+  it('documents installation metrics, the date range and session requirement', () => {
+    const operation = document.paths['/api/installations/{id}/metrics'].get!;
+    expect(operation.security).toEqual([{ session: [] }]);
+    expect(
+      (operation.parameters as ParameterObject[])
+        .map((parameter) => parameter.name)
+        .sort(),
+    ).toEqual(['from', 'id', 'to']);
+    expect(
+      (operation.responses['200'] as ResponseObject).content?.[
+        'application/json'
+      ].schema,
+    ).toEqual({ $ref: '#/components/schemas/InstallationMetrics' });
+    expect(apiSchemas.EnergyConsumed.properties?.value).toMatchObject({
+      type: 'number',
+      nullable: true,
+    });
+  });
+
   it('produces a valid OpenAPI document for tooling and client generation', async () => {
     // Validation dereferences/mutates its input; preserve the source document.
     await SwaggerParser.validate(JSON.parse(JSON.stringify(document)));
@@ -305,6 +324,7 @@ describe('Swagger documentation', () => {
       .send({ username, password })
       .expect(200);
     expect(login.body.user.username).toBe(username);
+    await agent.get('/api/installations/not-a-uuid/metrics').expect(400);
     expect(login.headers['set-cookie']).toEqual(
       expect.arrayContaining([
         expect.stringContaining('better-auth.session_token='),

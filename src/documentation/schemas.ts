@@ -312,6 +312,48 @@ export const apiSchemas: Record<string, SchemaObject> = {
     description:
       'Alterar role ou senha revoga as sessões. Username e empresa são imutáveis. O administrador automático não pode ser rebaixado para user.',
   }),
+  InstallationMetrics: object({
+    installationId: uuid,
+    period: object({
+      from: dateTime,
+      to: dateTime,
+      timeZone: {
+        type: 'string',
+        example: 'America/Sao_Paulo',
+        description:
+          'Fuso usado no período padrão de hoje. Datas retornadas em UTC.',
+      },
+    }),
+    metrics: object({ energyConsumed: ref('EnergyConsumed') }),
+  }),
+  EnergyConsumed: object({
+    value: {
+      type: 'number',
+      nullable: true,
+      minimum: 0,
+      example: 1.25,
+      description:
+        'Energia AC estimada, arredondada a 6 casas decimais. null significa ausência de leituras válidas; zero é consumo medido igual a zero.',
+    },
+    unit: { type: 'string', enum: ['kWh'] },
+    estimated: { type: 'boolean', enum: [true] },
+    samplingIntervalSeconds: { type: 'integer', enum: [15] },
+    validSamples: { type: 'integer', minimum: 0, example: 240 },
+    invalidSamples: {
+      type: 'integer',
+      minimum: 0,
+      example: 0,
+      description:
+        'Leituras não duplicadas descartadas por valores ausentes, inválidos ou fora do intervalo permitido.',
+    },
+    duplicateSamples: {
+      type: 'integer',
+      minimum: 0,
+      example: 0,
+      description:
+        'Reenvios com o mesmo deviceId/time descartados. Prevalece maior createdAt, depois maior id.',
+    },
+  }),
   Installation: object({
     id: uuid,
     companyId: uuid,

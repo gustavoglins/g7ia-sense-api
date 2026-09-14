@@ -12,6 +12,8 @@ import { assertManage, assertRead, loadActor } from '../auth/roles.js';
 import { inputObject, requiredText } from '../common/input.js';
 import { companies } from '../companies/companies.schema.js';
 import { installations } from './installations.schema.js';
+import { METRICS_TIME_ZONE, metricsPeriod } from './metrics-period.js';
+import { energyConsumption } from './energy-consumption.js';
 import {
   CreateInstallationDto,
   installationFields,
@@ -111,6 +113,20 @@ export class InstallationsService {
     } catch (error) {
       this.rethrow(error);
     }
+  }
+
+  async metrics(actorId: string, id: string, input: unknown = {}) {
+    const period = metricsPeriod(input);
+    await this.findOne(actorId, id);
+    return {
+      installationId: id,
+      period: {
+        from: period.from.toISOString(),
+        to: period.to.toISOString(),
+        timeZone: METRICS_TIME_ZONE,
+      },
+      metrics: { energyConsumed: await energyConsumption(this.db, id, period) },
+    };
   }
 
   async remove(actorId: string, id: string) {
