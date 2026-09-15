@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { energyConsumption } from './energy-consumption.js';
+import { energyConsumption } from '../energy-consumption.js';
 
 // Uses only session-local temporary tables in an explicitly provided test DB.
 // Never reads DATABASE_URL or modifies the application's tables.

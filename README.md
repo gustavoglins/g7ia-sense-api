@@ -35,7 +35,7 @@ devices retornam somente os dados cadastrais e as chaves. DELETE é definitivo.
 A documentação fica em `src/documentation/`, e os decorators dos controllers
 associam cada rota ao contrato correspondente. Não altera as validações nem as
 permissões dos serviços. Os testes de documentação rodam com
-`npx vitest run src/documentation/swagger.spec.ts` e não precisam de PostgreSQL.
+`npx vitest run src/documentation/tests/swagger.spec.ts` e não precisam de PostgreSQL.
 
 Referências: [Swagger no NestJS](https://docs.nestjs.com/openapi/introduction) e
 [username no Better Auth](https://better-auth.com/docs/plugins/username).
@@ -106,7 +106,7 @@ O objeto `metrics` permite adicionar outras métricas sem mudar a estrutura atua
 
 Os testes da consulta SQL usam tabelas temporárias e uma URL de teste explícita
 `METRICS_TEST_DATABASE_URL` (nunca `DATABASE_URL`). Execute
-`npx vitest run src/installations/energy-consumption.integration.spec.ts`
+`npx vitest run src/installations/tests/energy-consumption.integration.spec.ts`
 com essa variável apontando para um PostgreSQL de teste.
 
 Referência do cálculo: [potência e energia elétrica — Fluke](https://www.fluke.com/en-us/learn/blog/electrical/electrical-glossary).
@@ -641,14 +641,14 @@ A migração `0005` adiciona `role`, atribui `admin` aos usuários automáticos 
 ```sh
 npm run build
 npm run lint
-npx vitest run src/auth/auth-options.spec.ts
+npx vitest run src/auth/tests/auth-options.spec.ts
 ```
 
 Os testes PostgreSQL exigem um banco **vazio e descartável**, indicado explicitamente em `DATABASE_TEST_URL`. Eles aplicam todas as migrações e deixam os dados de teste nesse banco. Nunca usam `DATABASE_URL`.
 
 ```powershell
 $env:DATABASE_TEST_URL = 'postgresql://usuario:senha@localhost:5432/banco_descartavel'
-npx vitest run src/auth/auth-options.spec.ts src/companies/companies.integration.spec.ts
+npx vitest run src/auth/tests/auth-options.spec.ts src/companies/tests/companies.integration.spec.ts
 ```
 
 Os testes cobrem login, criação atômica, escopo de leitura, operações administrativas, tentativas de elevação de privilégio e revogação de sessões.

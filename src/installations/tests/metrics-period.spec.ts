@@ -1,4 +1,4 @@
-import { metricsPeriod } from './metrics-period.js';
+import { metricsPeriod } from '../metrics-period.js';
 
 describe('installation metrics period', () => {
   it('defaults to today in São Paulo regardless of the server timezone', () => {

@@ -16,25 +16,25 @@ import type {
   ResponseObject,
   SchemaObject,
 } from '@nestjs/swagger';
-import { authOptions } from '../auth/auth-options.js';
-import { CompaniesController } from '../companies/companies.controller.js';
-import { CompaniesService } from '../companies/companies.service.js';
-import { CreateCompanyDto } from '../companies/dto/create-company.dto.js';
-import { UsersController } from '../users/users.controller.js';
-import { UsersService } from '../users/users.service.js';
-import { InstallationsController } from '../installations/installations.controller.js';
-import { InstallationsService } from '../installations/installations.service.js';
-import { CreateInstallationDto } from '../installations/dto/create-installation.dto.js';
-import { SectorsController } from '../sectors/sectors.controller.js';
-import { SectorsService } from '../sectors/sectors.service.js';
-import { CreateSectorDto } from '../sectors/dto/create-sector.dto.js';
-import { DevicesController } from '../devices/devices.controller.js';
-import { DevicesService } from '../devices/devices.service.js';
-import { CreateDeviceDto } from '../devices/dto/create-device.dto.js';
-import { TelemetryController } from '../telemetry/telemetry.controller.js';
-import { TelemetryService } from '../telemetry/telemetry.service.js';
-import { apiSchemas, telemetryExamples } from './schemas.js';
-import { setupSwagger } from './swagger.js';
+import { authOptions } from '../../auth/auth-options.js';
+import { CompaniesController } from '../../companies/companies.controller.js';
+import { CompaniesService } from '../../companies/companies.service.js';
+import { CreateCompanyDto } from '../../companies/dto/create-company.dto.js';
+import { UsersController } from '../../users/users.controller.js';
+import { UsersService } from '../../users/users.service.js';
+import { InstallationsController } from '../../installations/installations.controller.js';
+import { InstallationsService } from '../../installations/installations.service.js';
+import { CreateInstallationDto } from '../../installations/dto/create-installation.dto.js';
+import { SectorsController } from '../../sectors/sectors.controller.js';
+import { SectorsService } from '../../sectors/sectors.service.js';
+import { CreateSectorDto } from '../../sectors/dto/create-sector.dto.js';
+import { DevicesController } from '../../devices/devices.controller.js';
+import { DevicesService } from '../../devices/devices.service.js';
+import { CreateDeviceDto } from '../../devices/dto/create-device.dto.js';
+import { TelemetryController } from '../../telemetry/telemetry.controller.js';
+import { TelemetryService } from '../../telemetry/telemetry.service.js';
+import { apiSchemas, telemetryExamples } from '../schemas.js';
+import { setupSwagger } from '../swagger.js';
 
 describe('Swagger documentation', () => {
   let app: INestApplication;

@@ -3,7 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { InstallationsService } from './installations.service.js';
+import { InstallationsService } from '../installations.service.js';
 
 describe('installation metrics authorization', () => {
   const period = { from: '2026-09-12T00:00:00Z', to: '2026-09-13T00:00:00Z' };
@@ -16,18 +16,16 @@ describe('installation metrics authorization', () => {
       select: vi.fn(() => ({
         from: () => ({ where: async () => rows.shift() }),
       })),
-      execute: vi
-        .fn()
-        .mockResolvedValue({
-          rows: [
-            {
-              value: null,
-              validSamples: 0,
-              invalidSamples: 0,
-              duplicateSamples: 0,
-            },
-          ],
-        }),
+      execute: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            value: null,
+            validSamples: 0,
+            invalidSamples: 0,
+            duplicateSamples: 0,
+          },
+        ],
+      }),
     };
     return { service: new InstallationsService(db as never), db };
   }

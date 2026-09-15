@@ -1,8 +1,8 @@
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { hashPassword } from 'better-auth/crypto';
-import { authOptions } from './auth-options.js';
-import { companyUsernameSuffix, isValidUsername } from './username.js';
+import { authOptions } from '../auth-options.js';
+import { companyUsernameSuffix, isValidUsername } from '../username.js';
 
 describe('username authentication', () => {
   const password = 'test-password-123';

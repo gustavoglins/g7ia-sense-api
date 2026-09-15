@@ -1,19 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DevicesService } from './devices.service.js';
-import { DATABASE_CONNECTION } from '../database/database-connection.js';
+import { SectorsService } from '../sectors.service.js';
+import { DATABASE_CONNECTION } from '../../database/database-connection.js';
 
-describe('DevicesService', () => {
-  let service: DevicesService;
+describe('SectorsService', () => {
+  let service: SectorsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        DevicesService,
+        SectorsService,
         { provide: DATABASE_CONNECTION, useValue: {} },
       ],
     }).compile();
 
-    service = module.get<DevicesService>(DevicesService);
+    service = module.get<SectorsService>(SectorsService);
   });
 
   it('should be defined', () => {

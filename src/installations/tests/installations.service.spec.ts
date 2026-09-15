@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { InstallationsService } from './installations.service.js';
-import { DATABASE_CONNECTION } from '../database/database-connection.js';
+import { InstallationsService } from '../installations.service.js';
+import { DATABASE_CONNECTION } from '../../database/database-connection.js';
 
 describe('InstallationsService', () => {
   let service: InstallationsService;
