@@ -28,7 +28,14 @@ import { TelemetryModule } from './telemetry/telemetry.module.js';
             provider: 'pg',
           }),
           // trustedOrigins: [configService.getOrThrow('FRONTEND_URL')],
-          trustedOrigins: ['http://localhost:3001'],
+          trustedOrigins: [
+            'http://localhost:3001',
+            'http://localhost:8081',
+            'http://192.168.0.136:8081',
+            'g7iv2mobile://',
+            'exp://192.168.0.136:8081',
+            ...(process.env.NODE_ENV === 'development' ? ['exp://'] : []), // Libera qualquer porta do expo quando estiver em dev mode
+          ],
         }),
       }),
       inject: [DATABASE_CONNECTION, ConfigService],

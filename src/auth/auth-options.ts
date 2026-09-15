@@ -2,6 +2,7 @@ import type { BetterAuthOptions } from 'better-auth';
 import { username } from 'better-auth/plugins';
 import { userOptions } from './user-options.js';
 import { isValidUsername, normalizeUsername } from './username.js';
+import { expo } from '@better-auth/expo';
 
 // Keep the credential authenticator enabled for username/password verification.
 // Provisioning users is handled by the application, never by public sign-up.
@@ -18,5 +19,6 @@ export const authOptions = {
       usernameValidator: (value) => isValidUsername(normalizeUsername(value)),
       validationOrder: { username: 'pre-normalization' },
     }),
+    expo(),
   ],
 } satisfies BetterAuthOptions;
